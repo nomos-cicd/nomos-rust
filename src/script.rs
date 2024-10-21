@@ -1,4 +1,12 @@
+use std::process::Command;
+use std::{fs::File, io::BufReader, path::PathBuf};
+
 use chrono::{DateTime, Utc};
+use serde::Deserialize;
+
+pub trait ScriptExecutor {
+    fn execute(&self) -> Result<(), String>;
+}
 
 pub struct BashScript {
     pub code: String,
@@ -13,6 +21,7 @@ pub enum ScriptType {
     Python(PythonScript),
 }
 
+#[derive(Deserialize, Debug)]
 pub struct ScriptParameter {
     pub name: String,
     pub description: String,
@@ -62,18 +71,14 @@ impl Default for ScriptStep {
     }
 }
 
-// pub fn run_script(script: &Script) {
-//     for step in script.steps.iter() {
-//         println!("Running step: {}", step.name);
-//     }
-// }
-
+#[derive(Deserialize, Debug)]
 pub struct YamlScriptStep {
     pub name: String,
     pub bash: Option<String>,
     pub python: Option<String>,
 }
 
+#[derive(Deserialize, Debug)]
 pub struct YamlScript {
     pub id: String,
     pub name: String,
@@ -110,3 +115,70 @@ impl From<YamlScript> for Script {
         }
     }
 }
+
+impl TryFrom<PathBuf> for YamlScript {
+    type Error = &'static str;
+
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        let file = File::open(path).map_err(|_| "Could not open file")?;
+        let reader = BufReader::new(file);
+        serde_yaml::from_reader(reader).map_err(|_| "Could not parse YAML")
+    }
+}
+
+impl ScriptExecutor for BashScript {
+    fn execute(&self) -> Result<(), String> {
+        let output = if cfg!(target_os = "windows") {
+            Command::new("cmd")
+                .args(&["/C", &self.code])
+                .output()
+                .map_err(|e| e.to_string())?
+        } else {
+            Command::new("sh")
+                .arg("-c")
+                .arg(&self.code)
+                .output()
+                .map_err(|e| e.to_string())?
+        };
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+}
+
+impl ScriptExecutor for PythonScript {
+    fn execute(&self) -> Result<(), String> {
+        let output = Command::new("python")
+            .arg("-c")
+            .arg(&self.code)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&output.stderr).to_string())
+        }
+    }
+}
+
+impl ScriptExecutor for ScriptType {
+    fn execute(&self) -> Result<(), String> {
+        match self {
+            ScriptType::Bash(bash) => bash.execute(),
+            ScriptType::Python(python) => python.execute(),
+        }
+    }
+}
+
+// impl Script {
+//     pub fn execute(&self) -> Result<(), String> {
+//         for step in self.steps.iter() {
+//             for value in step.values.iter() {
+//                 value.execute()?;
+//             }
+//         }
+//         Ok(())
+//     }
+// }

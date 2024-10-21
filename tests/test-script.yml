@@ -1,0 +1,11 @@
+id: test-script
+name: Test Script
+parameters:
+  - name: test_param
+    description: Test parameter
+    default: 1
+    required: true
+    type: int
+steps:
+  - name: Test Step
+    bash: echo "Hello, World!"

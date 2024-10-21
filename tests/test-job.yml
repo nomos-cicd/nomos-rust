@@ -1,0 +1,17 @@
+id: test-job
+name: Test Job
+parameters:
+  - name: test_param
+    default: "1"
+triggers:
+  - type: manual
+    value: {}
+  - type: github
+    value:
+      branch: main
+      events:
+        - push
+        - pull_request
+      secret: secret
+      url: https://github.com/owner/repo
+script_id: test-script
