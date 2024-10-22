@@ -21,7 +21,10 @@ async fn main() {
         .route("/credentials/:id", routing::delete(delete_credential))
         .route("/scripts", routing::get(get_scripts))
         .route("/scripts", routing::post(create_script))
-        .route("/scripts/:id", routing::delete(delete_script));
+        .route("/scripts/:id", routing::delete(delete_script))
+        .route("/jobs", routing::get(get_jobs))
+        .route("/jobs", routing::post(create_job))
+        .route("/jobs/:id", routing::delete(delete_job));
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -53,7 +56,7 @@ async fn get_scripts() -> Json<Vec<script::Script>> {
     Json(scripts)
 }
 
-async fn create_script(Json(script): Json<script::YamlScript>) -> Json<script::Script> {
+async fn create_script(Json(script): Json<script::Script>) -> Json<script::Script> {
     let script = script::Script::try_from(script).unwrap();
     script.sync(None);
     Json(script)
@@ -65,5 +68,25 @@ async fn delete_script(Path(id): Path<String>) -> StatusCode {
         return StatusCode::NOT_FOUND;
     }
     script.unwrap().delete();
+    StatusCode::NO_CONTENT
+}
+
+async fn get_jobs() -> Json<Vec<job::Job>> {
+    let jobs = job::Job::get_all();
+    Json(jobs)
+}
+
+async fn create_job(Json(job): Json<job::Job>) -> Json<job::Job> {
+    let job = job::Job::try_from(job).unwrap();
+    job.sync(None);
+    Json(job)
+}
+
+async fn delete_job(Path(id): Path<String>) -> StatusCode {
+    let job = job::Job::get(id.as_str());
+    if let None = job {
+        return StatusCode::NOT_FOUND;
+    }
+    job.unwrap().delete();
     StatusCode::NO_CONTENT
 }

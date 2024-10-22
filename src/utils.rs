@@ -73,14 +73,14 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
     // Log stdout in real-time
     for line in stdout_reader.lines() {
         if let Ok(line) = line {
-            job_result.add_log(LogLevel::Info, line.clone())?;
+            job_result.add_log(LogLevel::Info, line.clone());
         }
     }
 
     // Log stderr in real-time
     for line in stderr_reader.lines() {
         if let Ok(line) = line {
-            job_result.add_log(LogLevel::Error, line.clone())?;
+            job_result.add_log(LogLevel::Error, line.clone());
         }
     }
 

@@ -55,7 +55,7 @@ pub struct ScriptParameter {
     pub default: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
@@ -66,18 +66,12 @@ pub struct ScriptStep {
     pub finished_at: DateTime<Utc>,
 }
 
-impl PartialEq for ScriptStep {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.values == other.values
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Script {
     pub id: String,
     pub name: String,
     pub parameters: Vec<ScriptParameter>,
-    pub steps: Vec<ScriptStep>,
+    pub steps: Vec<YamlScriptStep>,
 }
 
 impl Script {
@@ -85,7 +79,7 @@ impl Script {
     pub(crate) fn get(script_id: &str) -> Option<Self> {
         let path = default_scripts_location().join(format!("{}.yml", script_id));
         if path.exists() {
-            let yaml_script = YamlScript::try_from(path).ok()?;
+            let yaml_script = Script::try_from(path).ok()?;
             Some(Script::from(yaml_script))
         } else {
             None
@@ -106,12 +100,10 @@ impl Script {
 
     /// Save as YamlScript. Primarily used after creating a new script.
     pub fn sync(&self, job_result: Option<&mut JobResult>) {
-        let self_script = YamlScript::from(self);
         let existing_script = Script::get(self.id.as_str());
 
         if let Some(existing_script) = existing_script {
-            let existing_yaml_script = YamlScript::from(&existing_script);
-            if existing_yaml_script != self_script {
+            if existing_script != *self {
                 self.save();
                 job_result.map(|job_result| {
                     job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id))
@@ -135,7 +127,7 @@ impl Script {
     fn save(&self) {
         let path = default_scripts_location().join(format!("{}.yml", self.id));
         let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, &YamlScript::from(self))
+        serde_yaml::to_writer(file, self)
             .map_err(|e| e.to_string())
             .unwrap();
     }
@@ -153,8 +145,12 @@ impl TryFrom<PathBuf> for Script {
 
     /// Reads as YamlScript and converts to Script. Primarily used for creating a new script.
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let yaml_script = YamlScript::try_from(path).map_err(|_| "Could not parse YAML")?;
-        Ok(Script::from(yaml_script))
+        let file = File::open(path).map_err(|_| "Could not open file")?;
+        let reader = BufReader::new(file);
+        serde_yaml::from_reader(reader).map_err(|e| {
+            eprintln!("Error reading YAML: {}", e);
+            "Could not parse YAML"
+        })
     }
 }
 
@@ -178,64 +174,13 @@ pub struct YamlScriptStep {
     pub values: Vec<ScriptType>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub struct YamlScript {
-    pub id: String,
-    pub name: String,
-    pub parameters: Vec<ScriptParameter>,
-    pub steps: Vec<YamlScriptStep>,
-}
-
-impl From<YamlScript> for Script {
-    fn from(yaml_script: YamlScript) -> Self {
-        let steps = yaml_script
-            .steps
-            .iter()
-            .map(|step| ScriptStep {
-                name: step.name.clone(),
-                values: step.values.clone(),
-                ..Default::default()
-            })
-            .collect();
-        Script {
-            id: yaml_script.id,
-            name: yaml_script.name,
-            parameters: yaml_script.parameters,
-            steps,
+impl From<&YamlScriptStep> for ScriptStep {
+    fn from(step: &YamlScriptStep) -> Self {
+        ScriptStep {
+            name: step.name.clone(),
+            values: step.values.clone(),
+            ..Default::default()
         }
-    }
-}
-
-impl From<&Script> for YamlScript {
-    fn from(script: &Script) -> Self {
-        let steps = script
-            .steps
-            .iter()
-            .map(|step| YamlScriptStep {
-                name: step.name.clone(),
-                values: step.values.clone(),
-            })
-            .collect();
-        YamlScript {
-            id: script.id.to_string(),
-            name: script.name.to_string(),
-            parameters: script.parameters.clone(),
-            steps,
-        }
-    }
-}
-
-impl TryFrom<PathBuf> for YamlScript {
-    type Error = &'static str;
-
-    /// Reads as YamlScript and converts to Script. Primarily used before executing a job.
-    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = File::open(path).map_err(|_| "Could not open file")?;
-        let reader = BufReader::new(file);
-        serde_yaml::from_reader(reader).map_err(|e| {
-            eprintln!("Error reading YAML: {}", e);
-            "Could not parse YAML"
-        })
     }
 }
 

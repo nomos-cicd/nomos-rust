@@ -35,43 +35,27 @@ pub struct JobParameterDefinition {
     pub default: Option<String>,
 }
 
+#[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Job {
     pub id: String,
     pub name: String,
     pub parameters: Vec<JobParameterDefinition>,
     pub triggers: Vec<TriggerType>,
     pub script_id: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
     pub read_only: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct JobResult {
     pub id: String,
     pub job_id: String,
     pub is_success: bool,
     pub steps: Vec<ScriptStep>,
-    pub current_step: Option<ScriptStep>,
+    pub current_step_name: Option<String>,
     pub started_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
-    logger: JobLogger,
-}
-
-impl Default for Job {
-    fn default() -> Self {
-        Job {
-            id: String::new(),
-            name: String::new(),
-            parameters: vec![],
-            triggers: vec![],
-            script_id: String::new(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            read_only: false,
-        }
-    }
+    pub logger: JobLogger,
 }
 
 impl Default for JobResult {
@@ -83,7 +67,7 @@ impl Default for JobResult {
             job_id: String::new(),
             is_success: true,
             steps: vec![],
-            current_step: None,
+            current_step_name: None,
             started_at: Utc::now(),
             updated_at: Utc::now(),
             finished_at: None,
@@ -98,18 +82,25 @@ impl TryFrom<PathBuf> for Job {
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
         let file = File::open(path).map_err(|_| "Could not open file")?;
         let reader = BufReader::new(file);
-        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
-        let yaml_job: YamlJob = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
-        Job::try_from(yaml_job)
+        serde_yaml::from_reader(reader).map_err(|e| e.to_string())
     }
 }
 
 impl From<&Job> for JobResult {
     fn from(job: &Job) -> Self {
+        let steps: Vec<ScriptStep> = Script::get(&job.script_id)
+            .map(|script| {
+                script
+                    .steps
+                    .iter()
+                    .map(|step| ScriptStep::from(step))
+                    .collect()
+            })
+            .unwrap();
         JobResult {
             job_id: job.id.clone(),
-            steps: Script::get(&job.script_id).unwrap().steps.to_vec(),
-            current_step: Script::get(&job.script_id).unwrap().steps.first().cloned(),
+            steps: steps.clone(),
+            current_step_name: steps.first().map(|step| step.name.clone()),
             ..Default::default()
         }
     }
@@ -117,71 +108,44 @@ impl From<&Job> for JobResult {
 
 impl From<(&Job, &Script)> for JobResult {
     fn from((job, script): (&Job, &Script)) -> Self {
+        let steps: Vec<ScriptStep> = Script::get(&job.script_id)
+            .map(|script| {
+                script
+                    .steps
+                    .iter()
+                    .map(|step| ScriptStep::from(step))
+                    .collect()
+            })
+            .unwrap();
         JobResult {
             job_id: job.id.clone(),
-            steps: script.steps.to_vec(),
-            current_step: script.steps.first().cloned(),
+            steps: steps.clone(),
+            current_step_name: steps.first().map(|step| step.name.clone()),
             ..Default::default()
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct YamlJob {
-    pub id: String,
-    pub name: String,
-    pub parameters: Vec<JobParameterDefinition>,
-    pub triggers: Vec<TriggerType>,
-    pub script_id: String,
-    pub read_only: bool,
-}
-
-impl TryFrom<YamlJob> for Job {
-    type Error = String;
-
-    /// Reads as YamlJob and converts to Job. Primarily used before executing a job.
-    fn try_from(value: YamlJob) -> Result<Self, Self::Error> {
-        Ok(Job {
-            id: value.id,
-            name: value.name,
-            parameters: value.parameters,
-            triggers: value.triggers,
-            script_id: value.script_id,
-            read_only: value.read_only,
-            ..Default::default()
-        })
-    }
-}
-
-impl TryFrom<PathBuf> for YamlJob {
-    type Error = String;
-
-    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = File::open(path).map_err(|_| "Could not open file")?;
-        let reader = BufReader::new(file);
-        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
-        let yaml_job: YamlJob = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
-        Ok(yaml_job)
-    }
-}
-
-impl From<&Job> for YamlJob {
-    fn from(job: &Job) -> Self {
-        YamlJob {
-            id: job.id.clone(),
-            name: job.name.clone(),
-            parameters: job.parameters.clone(),
-            triggers: job.triggers.clone(),
-            script_id: job.script_id.clone(),
-            read_only: job.read_only,
         }
     }
 }
 
 impl JobResult {
+    pub fn get_current_step_mut(&mut self) -> Option<&mut ScriptStep> {
+        if let Some(ref current_step_name) = self.current_step_name {
+            self.steps
+                .iter_mut()
+                .find(|step| step.name == *current_step_name)
+        } else {
+            None
+        }
+    }
+
     pub fn start_step(&mut self) {
-        if let Some(_current_step) = &self.current_step {
-            self.current_step.as_mut().unwrap().start();
+        if let Some(_current_step) = &self.current_step_name {
+            let current_step = self.get_current_step_mut();
+            if let Some(current_step) = current_step {
+                current_step.start();
+                self.save();
+            } else {
+                panic!("No current step");
+            }
         } else {
             panic!("No current step");
         }
@@ -189,60 +153,117 @@ impl JobResult {
 
     pub fn finish_step(&mut self, is_success: bool) {
         let now: DateTime<Utc> = Utc::now();
-        if let Some(current_step) = self.current_step.as_mut() {
-            current_step.finish(is_success);
+        if let Some(current_step_name) = self.current_step_name.clone() {
+            let current_step = self.get_current_step_mut();
+            if let Some(current_step) = current_step {
+                current_step.finish(is_success);
+            } else {
+                panic!("No current step");
+            }
             if !is_success {
                 self.is_success = false;
                 self.updated_at = now;
                 self.finished_at = Some(now);
+                self.save();
                 return;
             }
 
             let index = self
                 .steps
                 .iter()
-                .position(|step| step.name == current_step.name);
+                .position(|step| step.name == current_step_name.to_string());
             if let Some(index) = index {
                 if index + 1 < self.steps.len() {
-                    self.current_step = self.steps.get(index + 1).cloned();
+                    self.current_step_name =
+                        self.steps.get(index + 1).cloned().map(|step| step.name);
                     self.updated_at = now;
                 } else {
                     let now: DateTime<Utc> = Utc::now();
                     self.updated_at = now;
                     self.finished_at = Some(now);
                 }
+                self.save();
             }
         } else {
             panic!("No current step");
         }
     }
 
-    pub fn add_log(&mut self, level: LogLevel, message: String) -> Result<(), String> {
+    pub fn add_log(&mut self, level: LogLevel, message: String) {
         eprintln!("{:?}: {}", level, message);
-        if let Some(current_step) = &self.current_step {
-            self.logger.log(level, &current_step.name, &message)
-        } else {
-            Ok(()) // Or return an error if no current step
+        if let Some(current_step_name) = &self.current_step_name {
+            let _ = self.logger.log(level, &current_step_name, &message);
         }
     }
 
-    pub fn get_logs(&self) -> Result<Vec<Log>, String> {
-        self.logger.get_logs()
+    pub fn get_all() -> Vec<Self> {
+        let path = default_job_results_location();
+        let mut job_results = Vec::new();
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
+            let entry = entry.map_err(|e| e.to_string()).unwrap();
+            let path = entry.path();
+            let job_result = JobResult::try_from(path)
+                .map_err(|e| e.to_string())
+                .unwrap();
+            job_results.push(job_result);
+        }
+        job_results
+    }
+
+    pub fn get(id: &str) -> Option<Self> {
+        let path = default_job_results_location().join(id);
+        if path.exists() {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .ok()?;
+            serde_yaml::from_str(&content)
+                .map_err(|e| e.to_string())
+                .ok()
+        } else {
+            None
+        }
+    }
+
+    pub fn delete(&self) {
+        let path = default_job_results_location()
+            .join(&self.id)
+            .join("result.yml");
+        std::fs::remove_file(path)
+            .map_err(|e| e.to_string())
+            .unwrap();
+    }
+
+    pub fn save(&self) {
+        let path = default_job_results_location()
+            .join(&self.id)
+            .join("result.yml");
+        let file = File::create(path).map_err(|e| e.to_string()).unwrap();
+        serde_yaml::to_writer(file, self)
+            .map_err(|e| e.to_string())
+            .unwrap();
+    }
+}
+
+impl TryFrom<PathBuf> for JobResult {
+    type Error = String;
+
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        let file = File::open(path).map_err(|_| "Could not open file")?;
+        let reader = BufReader::new(file);
+        serde_yaml::from_reader(reader).map_err(|e| e.to_string())
     }
 }
 
 impl Job {
-    /// Reads as YamlJob and converts to Job. Primarily used before executing a job.
     pub fn get(id: &str) -> Option<Self> {
-        let path = default_jobs_location().join(format!("{}.yaml", id));
-        let yaml_job = YamlJob::try_from(path);
-        if let Ok(yaml_job) = yaml_job {
-            let job = Job::try_from(yaml_job);
-            if let Ok(job) = job {
-                Some(job)
-            } else {
-                None
-            }
+        let path = default_jobs_location().join(format!("{}.yml", id));
+        if path.exists() {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .ok()?;
+            serde_yaml::from_str(&content)
+                .map_err(|e| e.to_string())
+                .ok()
         } else {
             None
         }
@@ -286,15 +307,15 @@ impl Job {
     }
 
     fn save(&self) {
-        let path = default_jobs_location().join(format!("{}.yaml", self.id));
+        let path = default_jobs_location().join(format!("{}.yml", self.id));
         let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, &YamlJob::from(self))
+        serde_yaml::to_writer(file, self)
             .map_err(|e| e.to_string())
             .unwrap();
     }
 
     pub fn delete(&self) {
-        let path = PathBuf::from("jobs").join(format!("{}.yaml", self.id));
+        let path = PathBuf::from("jobs").join(format!("{}.yml", self.id));
         std::fs::remove_file(path)
             .map_err(|e| e.to_string())
             .unwrap();
@@ -341,10 +362,11 @@ impl Job {
 
         let _ = &job_result.start_step();
         while job_result.finished_at.is_none() {
-            // Clone current_step to avoid holding an immutable borrow of job_result
-            let current_step = job_result.current_step.as_ref().unwrap().clone();
+            // Clone `current_step` to avoid immutable borrow on `job_result`
+            let current_step = job_result.get_current_step_mut().unwrap().clone();
             let step_name = current_step.name.clone();
 
+            // Mutable borrow of `job_result` is now safe
             let result = current_step.execute(
                 &mut merged_parameters_with_prefix,
                 directory.clone(),

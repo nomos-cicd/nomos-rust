@@ -18,9 +18,9 @@ pub struct Log {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct JobLogger {
-    log_file: File,
+    log_filename: PathBuf,
     job_id: String,
     result_id: String,
 }
@@ -34,14 +34,14 @@ impl JobLogger {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
 
-        let file = OpenOptions::new()
+        let _ = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(log_path)
+            .open(log_path.clone())
             .map_err(|e| e.to_string())?;
 
         Ok(JobLogger {
-            log_file: file,
+            log_filename: log_path.clone(),
             job_id,
             result_id,
         })
@@ -55,9 +55,18 @@ impl JobLogger {
             timestamp: Utc::now(),
         };
 
-        let log_line = serde_json::to_string(&log).map_err(|e| e.to_string())?;
-        writeln!(self.log_file, "{}", log_line).map_err(|e| e.to_string())?;
-        self.log_file.flush().map_err(|e| e.to_string())?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&self.log_filename)
+            .map_err(|e| e.to_string())?;
+
+        writeln!(
+            file,
+            "{}",
+            serde_json::to_string(&log).map_err(|e| e.to_string())?
+        )
+        .map_err(|e| e.to_string())?;
 
         Ok(())
     }
