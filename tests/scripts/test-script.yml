@@ -8,7 +8,7 @@ parameters:
     type: int
 steps:
   - name: Test Step
-    value:
-      type: Bash
-      code: |
-        echo "Test script"
+    values:
+      - type: Bash
+        code: |
+          echo "Test script"

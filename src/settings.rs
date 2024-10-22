@@ -2,7 +2,11 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use crate::credential::{Credential, YamlCredential};
+use crate::{
+    credential::{Credential, YamlCredential},
+    job::Job,
+    script::Script,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
@@ -10,7 +14,8 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn apply(&self) {
+    pub fn sync(&self) {
+        let mut credential_ids: Vec<String> = Vec::new();
         for yaml_credential in &self.yaml_credentials {
             let credential = Credential::try_from(yaml_credential);
             if let Err(e) = credential {
@@ -18,14 +23,15 @@ impl Settings {
                 continue;
             }
 
-            // Check if exists
-            let existing_credential = Credential::get(credential.as_ref().unwrap().id.as_str());
-            if let Some(existing_credential) = existing_credential {
-                eprintln!("Credential {} already exists", existing_credential.id);
-                continue;
-            }
+            credential.unwrap().sync();
+            credential_ids.push(yaml_credential.id.clone());
+        }
 
-            credential.unwrap().save();
+        let credentials = Credential::get_all();
+        for credential in credentials {
+            if !credential_ids.contains(&credential.id) && !credential.read_only {
+                credential.delete();
+            }
         }
     }
 }
@@ -38,5 +44,27 @@ impl TryFrom<PathBuf> for Settings {
         let settings: Settings =
             serde_yaml::from_str(yaml_str.as_str()).map_err(|e| e.to_string())?;
         Ok(settings)
+    }
+}
+
+pub fn sync(directory: PathBuf) {
+    let settings_path = directory.join("settings.yaml");
+    let settings = Settings::try_from(settings_path).unwrap();
+    settings.sync();
+
+    let scripts_path = directory.join("scripts");
+    for entry in std::fs::read_dir(scripts_path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        let script = Script::try_from(path).unwrap();
+        script.sync();
+    }
+
+    let jobs_path = directory.join("jobs");
+    for entry in std::fs::read_dir(jobs_path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        let job = Job::try_from(path).unwrap();
+        job.sync();
     }
 }

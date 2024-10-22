@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use nomos_rust::script::{ScriptType, YamlScript, YamlScriptStep};
+use nomos_rust::script::{BashScript, Script, ScriptType, YamlScript, YamlScriptStep};
 
 #[test]
 fn create_script() {
@@ -10,14 +10,14 @@ fn create_script() {
         parameters: vec![],
         steps: vec![YamlScriptStep {
             name: "Step 1".to_string(),
-            value: ScriptType::Bash(nomos_rust::script::BashScript {
+            values: vec![ScriptType::Bash(BashScript {
                 code: "echo 'Hello'".to_string(),
-            }),
+            })],
             ..Default::default()
         }],
     };
 
-    let script = nomos_rust::script::Script::from(yaml_script);
+    let script = Script::from(yaml_script);
     assert_eq!(script.id, "test");
     assert_eq!(script.name, "Test");
     assert_eq!(script.parameters.len(), 0);

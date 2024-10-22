@@ -11,9 +11,8 @@ fn create_credential() {
 
     let yaml_credential = YamlCredential {
         id: "test-credential".to_string(),
-        value: serde_yaml::to_value(text_credential).unwrap(),
         read_only: false,
-        type_: "text".to_string(),
+        value: CredentialType::Text(text_credential),
     };
 
     let credential = Credential::try_from(yaml_credential);

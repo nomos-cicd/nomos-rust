@@ -5,3 +5,4 @@ parameters:
     default: "git@github.com:requizm/system-docs.git"
 triggers: []
 script_id: git-clone-script
+read_only: false

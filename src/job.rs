@@ -3,11 +3,12 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 use crate::script::{Script, ScriptExecutor, ScriptStep};
 
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
 pub struct ManualTriggerParameter {}
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct GithubTriggerParameter {
     pub branch: String,
     pub events: Vec<String>,
@@ -15,16 +16,14 @@ pub struct GithubTriggerParameter {
     pub url: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(tag = "type")]
 pub enum TriggerType {
     Manual(ManualTriggerParameter),
     Github(GithubTriggerParameter),
 }
 
-pub struct Trigger {
-    pub value: TriggerType,
-}
-
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct JobParameterDefinition {
     pub name: String,
     pub default: Option<String>,
@@ -34,10 +33,11 @@ pub struct Job {
     pub id: String,
     pub name: String,
     pub parameters: Vec<JobParameterDefinition>,
-    pub triggers: Vec<Trigger>,
+    pub triggers: Vec<TriggerType>,
     pub script_id: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub read_only: bool,
 }
 
 #[derive(Debug)]
@@ -62,6 +62,7 @@ impl Default for Job {
             script_id: String::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            read_only: false,
         }
     }
 }
@@ -78,6 +79,18 @@ impl Default for JobResult {
             updated_at: Utc::now(),
             finished_at: None,
         }
+    }
+}
+
+impl TryFrom<PathBuf> for Job {
+    type Error = String;
+
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        let file = File::open(&path).expect("Could not open file");
+        let reader = BufReader::new(file);
+        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).expect("Could not read file");
+        let yaml_job: YamlJob = serde_yaml::from_value(yaml).expect("Could not parse YAML");
+        Ok(Job::try_from(yaml_job).expect("Could not convert to job"))
     }
 }
 
@@ -109,56 +122,30 @@ impl From<(&Job, &Script)> for JobResult {
     }
 }
 
-#[derive(Deserialize, Debug)]
-pub struct YamlTrigger {
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub value: serde_yaml::Value,
-}
-
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct YamlJob {
     pub id: String,
     pub name: String,
     pub parameters: Vec<JobParameterDefinition>,
-    pub triggers: Vec<YamlTrigger>,
+    pub triggers: Vec<TriggerType>,
     pub script_id: String,
+    pub read_only: bool,
 }
 
 impl TryFrom<YamlJob> for Job {
     type Error = String;
 
+    /// Reads as YamlJob and converts to Job. Primarily used before executing a job.
     fn try_from(value: YamlJob) -> Result<Self, Self::Error> {
-        let mut job = Job::default();
-        job.id = value.id;
-        job.name = value.name;
-        job.script_id = value.script_id;
-
-        for parameter in value.parameters {
-            job.parameters.push(parameter);
-        }
-
-        for trigger in value.triggers {
-            match trigger.type_.as_str() {
-                "manual" => {
-                    job.triggers.push(Trigger {
-                        value: TriggerType::Manual(ManualTriggerParameter {}),
-                    });
-                }
-                "github" => {
-                    let github_trigger: GithubTriggerParameter =
-                        serde_yaml::from_value(trigger.value).expect("Could not parse trigger");
-                    job.triggers.push(Trigger {
-                        value: TriggerType::Github(github_trigger),
-                    });
-                }
-                _ => {
-                    return Err(format!("Unknown trigger type: {}", trigger.type_));
-                }
-            }
-        }
-
-        Ok(job)
+        Ok(Job {
+            id: value.id,
+            name: value.name,
+            parameters: value.parameters,
+            triggers: value.triggers,
+            script_id: value.script_id,
+            read_only: value.read_only,
+            ..Default::default()
+        })
     }
 }
 
@@ -171,6 +158,19 @@ impl TryFrom<PathBuf> for YamlJob {
         let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).expect("Could not read file");
         let yaml_job: YamlJob = serde_yaml::from_value(yaml).expect("Could not parse YAML");
         Ok(yaml_job)
+    }
+}
+
+impl From<&Job> for YamlJob {
+    fn from(job: &Job) -> Self {
+        YamlJob {
+            id: job.id.clone(),
+            name: job.name.clone(),
+            parameters: job.parameters.clone(),
+            triggers: job.triggers.clone(),
+            script_id: job.script_id.clone(),
+            read_only: job.read_only,
+        }
     }
 }
 
@@ -215,6 +215,51 @@ impl JobResult {
 }
 
 impl Job {
+    /// Reads as YamlJob and converts to Job. Primarily used before executing a job.
+    pub fn get(id: &str) -> Option<Self> {
+        let path = PathBuf::from("jobs").join(format!("{}.yaml", id));
+        let yaml_job = YamlJob::try_from(path).ok()?;
+        Some(Job::try_from(yaml_job).ok()?)
+    }
+
+    pub fn get_all() -> Vec<Self> {
+        let path = PathBuf::from("jobs");
+        let mut jobs = Vec::new();
+        for entry in std::fs::read_dir(path).expect("Could not read directory") {
+            let entry = entry.expect("Could not read entry");
+            let path = entry.path();
+            let job = Job::try_from(path).expect("Could not convert to job");
+            jobs.push(job);
+        }
+        jobs
+    }
+
+    pub fn sync(&self) {
+        let existing_job = Job::get(self.id.as_str());
+        if let Some(existing_job) = existing_job {
+            if existing_job.name != self.name
+                || existing_job.parameters != self.parameters
+                || existing_job.triggers != self.triggers
+                || existing_job.script_id != self.script_id
+            {
+                self.save();
+            }
+        } else {
+            self.save();
+        }
+    }
+
+    fn save(&self) {
+        let path = PathBuf::from("jobs").join(format!("{}.yaml", self.id));
+        let file = File::create(path).expect("Could not create file");
+        serde_yaml::to_writer(file, &YamlJob::from(self)).expect("Could not write to file");
+    }
+
+    pub fn delete(&self) {
+        let path = PathBuf::from("jobs").join(format!("{}.yaml", self.id));
+        std::fs::remove_file(&path).expect("Could not delete file");
+    }
+
     pub fn execute(&self, parameters: HashMap<String, String>) -> JobResult {
         let script = Script::get(&self.script_id).expect("Could not get script");
         self.execute_with_script(parameters, &script)

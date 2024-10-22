@@ -17,23 +17,23 @@ pub trait ScriptExecutor {
     ) -> Result<(), String>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BashScript {
     pub code: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PythonScript {
     pub code: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct GitCloneScript {
     pub url: String,
     pub credential_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum ScriptType {
     Bash(BashScript),
@@ -41,7 +41,7 @@ pub enum ScriptType {
     GitClone(GitCloneScript),
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub struct ScriptParameter {
     pub name: String,
     pub description: String,
@@ -49,7 +49,7 @@ pub struct ScriptParameter {
     pub default: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct ScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
@@ -80,15 +80,36 @@ impl Script {
         }
     }
 
-    /// Reads as YamlScript and converts to Script. Primarily used for creating a new script.
-    pub fn read_from_yml(path_str: &str) -> Option<Self> {
-        let path = PathBuf::from(path_str);
-        if path.exists() {
-            let yaml_script = YamlScript::try_from(path).ok()?;
-            Some(Script::from(yaml_script))
+    /// Save as YamlScript. Primarily used after creating a new script.
+    pub fn sync(&self) {
+        let existing_script = Script::get(self.id.as_str());
+        if let Some(existing_script) = existing_script {
+            if existing_script.name != self.name
+                || existing_script.parameters != self.parameters
+                || existing_script.steps != self.steps
+            {
+                self.save();
+            }
         } else {
-            None
+            self.save();
         }
+    }
+
+    fn save(&self) {
+        eprintln!("Saving script: {}", self.id);
+        let path = default_scripts_location().join(format!("{}.yml", self.id));
+        let file = File::create(path).expect("Could not create file");
+        serde_yaml::to_writer(file, &YamlScript::from(self)).expect("Could not write to file");
+    }
+}
+
+impl TryFrom<PathBuf> for Script {
+    type Error = &'static str;
+
+    /// Reads as YamlScript and converts to Script. Primarily used for creating a new script.
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        let yaml_script = YamlScript::try_from(path).map_err(|_| "Could not parse YAML")?;
+        Ok(Script::from(yaml_script))
     }
 }
 
@@ -117,24 +138,22 @@ impl Default for ScriptStep {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct YamlScriptStep {
     pub name: String,
-    pub value: ScriptType,
+    pub values: Vec<ScriptType>,
 }
 
 impl Default for YamlScriptStep {
     fn default() -> Self {
         YamlScriptStep {
             name: String::new(),
-            value: ScriptType::Bash(BashScript {
-                code: String::new(),
-            }),
+            values: vec![],
         }
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct YamlScript {
     pub id: String,
     pub name: String,
@@ -149,14 +168,33 @@ impl From<YamlScript> for Script {
             .iter()
             .map(|step| ScriptStep {
                 name: step.name.clone(),
-                values: vec![step.value.clone()],
+                values: step.values.clone(),
                 ..Default::default()
             })
             .collect();
         Script {
-            id: yaml_script.id.to_string(),
-            name: yaml_script.name.to_string(),
+            id: yaml_script.id,
+            name: yaml_script.name,
             parameters: yaml_script.parameters,
+            steps,
+        }
+    }
+}
+
+impl From<&Script> for YamlScript {
+    fn from(script: &Script) -> Self {
+        let steps = script
+            .steps
+            .iter()
+            .map(|step| YamlScriptStep {
+                name: step.name.clone(),
+                values: step.values.clone(),
+            })
+            .collect();
+        YamlScript {
+            id: script.id.to_string(),
+            name: script.name.to_string(),
+            parameters: script.parameters.clone(),
             steps,
         }
     }
@@ -165,10 +203,14 @@ impl From<YamlScript> for Script {
 impl TryFrom<PathBuf> for YamlScript {
     type Error = &'static str;
 
+    /// Reads as YamlScript and converts to Script. Primarily used before executing a job.
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
         let file = File::open(path).map_err(|_| "Could not open file")?;
         let reader = BufReader::new(file);
-        serde_yaml::from_reader(reader).map_err(|_| "Could not parse YAML")
+        serde_yaml::from_reader(reader).map_err(|e| {
+            eprintln!("Error reading YAML: {}", e);
+            "Could not parse YAML"
+        })
     }
 }
 
