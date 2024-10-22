@@ -1,6 +1,6 @@
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
-use crate::script::ScriptStep;
+use crate::script::{Script, ScriptExecutor, ScriptStep};
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -40,6 +40,7 @@ pub struct Job {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug)]
 pub struct JobResult {
     pub id: String,
     pub job_id: String,
@@ -61,6 +62,37 @@ impl Default for Job {
             script_id: String::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+        }
+    }
+}
+
+impl Default for JobResult {
+    fn default() -> Self {
+        JobResult {
+            id: String::new(),
+            job_id: String::new(),
+            is_finished: false,
+            is_success: true,
+            steps: vec![],
+            current_step: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
+impl From<&Job> for JobResult {
+    fn from(job: &Job) -> Self {
+        JobResult {
+            job_id: job.id.clone(),
+            steps: Script::get(&job.script_id)
+                .unwrap()
+                .steps
+                .iter()
+                .cloned()
+                .collect(),
+            current_step: Script::get(&job.script_id).unwrap().steps.get(0).cloned(),
+            ..Default::default()
         }
     }
 }
@@ -127,5 +159,68 @@ impl TryFrom<PathBuf> for YamlJob {
         let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).expect("Could not read file");
         let yaml_job: YamlJob = serde_yaml::from_value(yaml).expect("Could not parse YAML");
         Ok(yaml_job)
+    }
+}
+
+impl JobResult {
+    pub fn start_step(&mut self) {
+        if let Some(current_step) = &self.current_step {
+            self.current_step.as_mut().unwrap().start();
+        } else {
+            panic!("No current step");
+        }
+    }
+
+    pub fn finish_step(&mut self, is_success: bool) {
+        if let Some(mut current_step) = self.current_step.take() {
+            current_step.finish(is_success);
+            if !is_success {
+                self.is_success = false;
+                self.current_step = Some(current_step);
+                return;
+            }
+
+            let index = self
+                .steps
+                .iter()
+                .position(|step| step.name == current_step.name);
+            if let Some(index) = index {
+                if index + 1 < self.steps.len() {
+                    self.current_step = self.steps.get(index + 1).cloned();
+                } else {
+                    self.is_finished = true;
+                }
+            }
+            self.current_step = Some(current_step);
+        } else {
+            panic!("No current step");
+        }
+    }
+}
+
+impl Job {
+    pub fn execute(&self, parameters: HashMap<String, String>) -> JobResult {
+        self.execute_with_script(parameters, self.script_id.clone())
+    }
+
+    pub fn execute_with_script(
+        &self,
+        parameters: HashMap<String, String>,
+        script_id: String,
+    ) -> JobResult {
+        let mut job_result = Box::new(JobResult::from(self.clone()));
+
+        job_result.start_step();
+        while !job_result.is_finished {
+            let current_step = job_result.current_step.as_ref().unwrap();
+            let result = current_step.execute(parameters.clone());
+            if result.is_err() {
+                job_result.finish_step(false);
+                break;
+            }
+            job_result.finish_step(true);
+        }
+
+        *job_result
     }
 }

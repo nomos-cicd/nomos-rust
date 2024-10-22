@@ -32,7 +32,7 @@ fn create_script() {
 
 #[test]
 fn read_yml() {
-    let path_buf = PathBuf::from("tests/test-script.yml");
+    let path_buf = PathBuf::from("tests/scripts/test-script.yml");
     let yaml_script = YamlScript::try_from(path_buf);
     assert!(yaml_script.is_ok());
 }
