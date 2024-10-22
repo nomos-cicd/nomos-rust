@@ -18,7 +18,9 @@ pub struct SshCredentialParameter {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum CredentialType {
+    #[serde(rename = "text")]
     Text(TextCredentialParameter),
+    #[serde(rename = "ssh")]
     Ssh(SshCredentialParameter),
 }
 

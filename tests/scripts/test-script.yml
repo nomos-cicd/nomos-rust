@@ -9,6 +9,6 @@ parameters:
 steps:
   - name: Test Step
     values:
-      - type: Bash
+      - type: bash
         code: |
           echo "Test script"

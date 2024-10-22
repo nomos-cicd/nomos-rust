@@ -19,7 +19,9 @@ pub struct GithubTriggerParameter {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum TriggerType {
+    #[serde(rename = "manual")]
     Manual(ManualTriggerParameter),
+    #[serde(rename = "github")]
     Github(GithubTriggerParameter),
 }
 

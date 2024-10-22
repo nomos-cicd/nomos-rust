@@ -21,12 +21,6 @@ pub trait ScriptExecutor {
 pub struct BashScript {
     pub code: String,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PythonScript {
-    pub code: String,
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct GitCloneScript {
     pub url: String,
@@ -36,8 +30,9 @@ pub struct GitCloneScript {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum ScriptType {
+    #[serde(rename = "bash")]
     Bash(BashScript),
-    Python(PythonScript),
+    #[serde(rename = "git-clone")]
     GitClone(GitCloneScript),
 }
 
@@ -246,25 +241,6 @@ impl ScriptExecutor for BashScript {
     }
 }
 
-impl ScriptExecutor for PythonScript {
-    fn execute(
-        &self,
-        parameters: &mut HashMap<String, String>,
-        directory: PathBuf,
-        step_name: &str,
-    ) -> Result<(), String> {
-        let child = Command::new("python")
-            .arg("-c")
-            .arg(&self.code)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-
-        execute_script(child)
-    }
-}
-
 impl ScriptExecutor for GitCloneScript {
     fn execute(
         &self,
@@ -294,7 +270,7 @@ impl ScriptExecutor for GitCloneScript {
         }
 
         parameters.insert(
-            format!("$steps.{}.GitClone.directory", step_name),
+            format!("$steps.{}.git-clone.directory", step_name),
             cloned_dir.to_str().unwrap().to_string(),
         );
 
@@ -311,7 +287,6 @@ impl ScriptExecutor for ScriptType {
     ) -> Result<(), String> {
         match self {
             ScriptType::Bash(bash) => bash.execute(parameters, directory, step_name),
-            ScriptType::Python(python) => python.execute(parameters, directory, step_name),
             ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory, step_name),
         }
     }

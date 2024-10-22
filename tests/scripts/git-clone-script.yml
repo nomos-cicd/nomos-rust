@@ -12,12 +12,12 @@ parameters:
 steps:
   - name: Clone
     values:
-      - type: GitClone
+      - type: git-clone
         url: $parameters.git_clone_url
         credential_id: $parameters.git_credential_id
   - name: List files
     values:
-      - type: Bash
+      - type: bash
         code: |
-          echo $steps.Clone.GitClone.directory
+          echo $steps.Clone.git-clone.directory
           dir

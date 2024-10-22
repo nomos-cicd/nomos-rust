@@ -4,8 +4,8 @@ parameters:
   - name: test_param
     default: "1"
 triggers:
-  - type: Manual
-  - type: Github
+  - type: manual
+  - type: github
     branch: main
     events:
       - push
