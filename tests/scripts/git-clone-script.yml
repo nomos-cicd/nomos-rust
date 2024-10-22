@@ -1,0 +1,10 @@
+id: git-clone-script
+name: Git Clone Script
+parameters:
+  - name: git_clone_url
+    description: Git clone URL
+    required: true
+    type: string
+steps:
+  - name: Clone
+    bash: git clone $parameters.git_clone_url

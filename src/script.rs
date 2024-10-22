@@ -1,13 +1,18 @@
 use std::collections::HashMap;
-use std::io::BufRead;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
+use crate::utils::{execute_command, execute_script};
+
 pub trait ScriptExecutor {
-    fn execute(&self, parameters: HashMap<String, String>) -> Result<(), String>;
+    fn execute(
+        &self,
+        parameters: HashMap<String, String>,
+        directory: PathBuf,
+    ) -> Result<(), String>;
 }
 
 #[derive(Debug, Clone)]
@@ -154,30 +159,43 @@ impl TryFrom<PathBuf> for YamlScript {
 }
 
 impl ScriptExecutor for BashScript {
-    fn execute(&self, parameters: HashMap<String, String>) -> Result<(), String> {
-        let child = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .args(&["/C", &self.code])
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(|e| e.to_string())?
-        } else {
-            Command::new("sh")
-                .arg("-c")
-                .arg(&self.code)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(|e| e.to_string())?
-        };
+    fn execute(
+        &self,
+        parameters: HashMap<String, String>,
+        directory: PathBuf,
+    ) -> Result<(), String> {
+        let mut replaced_code = self.code.clone();
+        // example: $parameters.git_clone_url
+        for (key, value) in parameters.iter() {
+            replaced_code = replaced_code.replace(&format!("$parameters.{}", key), value);
+        }
 
-        execute_script(child)
+        let mut cmd_code = String::new();
+        for line in replaced_code.lines() {
+            cmd_code.push_str(line);
+            if cfg!(target_os = "windows") {
+                cmd_code.push_str(" && ");
+            } else {
+                cmd_code.push_str(" ; ");
+            }
+        }
+
+        if cmd_code.ends_with(" && ") {
+            cmd_code = cmd_code[..cmd_code.len() - 4].to_string();
+        } else if cmd_code.ends_with(" ; ") {
+            cmd_code = cmd_code[..cmd_code.len() - 3].to_string();
+        }
+
+        execute_command(&cmd_code, directory)
     }
 }
 
 impl ScriptExecutor for PythonScript {
-    fn execute(&self, parameters: HashMap<String, String>) -> Result<(), String> {
+    fn execute(
+        &self,
+        parameters: HashMap<String, String>,
+        directory: PathBuf,
+    ) -> Result<(), String> {
         let child = Command::new("python")
             .arg("-c")
             .arg(&self.code)
@@ -191,18 +209,26 @@ impl ScriptExecutor for PythonScript {
 }
 
 impl ScriptExecutor for ScriptType {
-    fn execute(&self, parameters: HashMap<String, String>) -> Result<(), String> {
+    fn execute(
+        &self,
+        parameters: HashMap<String, String>,
+        directory: PathBuf,
+    ) -> Result<(), String> {
         match self {
-            ScriptType::Bash(bash) => bash.execute(parameters),
-            ScriptType::Python(python) => python.execute(parameters),
+            ScriptType::Bash(bash) => bash.execute(parameters, directory),
+            ScriptType::Python(python) => python.execute(parameters, directory),
         }
     }
 }
 
 impl ScriptExecutor for ScriptStep {
-    fn execute(&self, parameters: HashMap<String, String>) -> Result<(), String> {
+    fn execute(
+        &self,
+        parameters: HashMap<String, String>,
+        directory: PathBuf,
+    ) -> Result<(), String> {
         for value in self.values.iter() {
-            value.execute(parameters.clone())?;
+            value.execute(parameters.clone(), directory.clone())?;
         }
         Ok(())
     }
@@ -230,39 +256,4 @@ pub fn default_scripts_location() -> PathBuf {
     };
     std::fs::create_dir_all(&path).expect("Could not create scripts directory");
     path
-}
-
-fn execute_script(mut child: Child) -> Result<(), String> {
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
-
-    let stdout_reader = BufReader::new(stdout);
-    let stderr_reader = BufReader::new(stderr);
-
-    // Log stdout in real-time
-    std::thread::spawn(move || {
-        for line in stdout_reader.lines() {
-            if let Ok(line) = line {
-                println!("STDOUT: {}", line);
-            }
-        }
-    });
-
-    // Log stderr in real-time
-    std::thread::spawn(move || {
-        for line in stderr_reader.lines() {
-            if let Ok(line) = line {
-                eprintln!("STDERR: {}", line);
-            }
-        }
-    });
-
-    // Wait for the child process to finish
-    let status = child.wait().map_err(|e| e.to_string())?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("Process exited with status: {}", status))
-    }
 }

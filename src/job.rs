@@ -100,6 +100,7 @@ impl From<&Job> for JobResult {
 impl From<(&Job, &Script)> for JobResult {
     fn from((job, script): (&Job, &Script)) -> Self {
         JobResult {
+            id: "1".to_string(),
             job_id: job.id.clone(),
             steps: script.steps.iter().cloned().collect(),
             current_step: script.steps.get(0).cloned(),
@@ -224,12 +225,36 @@ impl Job {
         parameters: HashMap<String, String>,
         script: &Script,
     ) -> JobResult {
+        let mut merged_parameters = parameters.clone();
+        for parameter in &self.parameters {
+            if !parameters.contains_key(&parameter.name) {
+                if let Some(default) = &parameter.default {
+                    merged_parameters.insert(parameter.name.clone(), default.clone());
+                }
+            }
+        }
+
+        let mut missing_parameters = vec![];
+        for parameter in &self.parameters {
+            if !merged_parameters.contains_key(&parameter.name) {
+                missing_parameters.push(parameter.name.clone());
+            }
+        }
+        if !missing_parameters.is_empty() {
+            panic!(
+                "Missing parameters: {}",
+                missing_parameters.join(", ")
+            );
+        }
+
         let mut job_result = Box::new(JobResult::from((self, script)));
+        let directory = default_job_results_location().join(&job_result.id);
+        std::fs::create_dir_all(&directory).expect("Could not create job_results directory");
 
         job_result.start_step();
         while !job_result.finished_at.is_some() {
             let current_step = job_result.current_step.as_ref().unwrap();
-            let result = current_step.execute(parameters.clone());
+            let result = current_step.execute(merged_parameters.clone(), directory.clone());
             if result.is_err() {
                 job_result.finish_step(false);
                 break;
@@ -239,4 +264,15 @@ impl Job {
 
         *job_result
     }
+}
+
+pub fn default_job_results_location() -> PathBuf {
+    let path = if cfg!(target_os = "windows") {
+        let appdata = std::env::var("APPDATA").expect("Could not get APPDATA");
+        PathBuf::from(appdata).join("nomos").join("job_results")
+    } else {
+        PathBuf::from("/var/lib/nomos/job_results")
+    };
+    std::fs::create_dir_all(&path).expect("Could not create job_results directory");
+    path
 }
