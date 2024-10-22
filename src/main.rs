@@ -44,7 +44,7 @@ async fn create_credential(Json(credential): Json<YamlCredential>) -> Json<crede
 
 async fn delete_credential(Path(id): Path<String>) -> StatusCode {
     let credential = credential::Credential::get(id.as_str());
-    if let None = credential {
+    if credential.is_none() {
         return StatusCode::NOT_FOUND;
     }
     credential.unwrap().delete();
@@ -64,7 +64,7 @@ async fn create_script(Json(script): Json<script::Script>) -> Json<script::Scrip
 
 async fn delete_script(Path(id): Path<String>) -> StatusCode {
     let script = script::Script::get(id.as_str());
-    if let None = script {
+    if script.is_none() {
         return StatusCode::NOT_FOUND;
     }
     script.unwrap().delete();
@@ -84,7 +84,7 @@ async fn create_job(Json(job): Json<job::Job>) -> Json<job::Job> {
 
 async fn delete_job(Path(id): Path<String>) -> StatusCode {
     let job = job::Job::get(id.as_str());
-    if let None = job {
+    if job.is_none() {
         return StatusCode::NOT_FOUND;
     }
     job.unwrap().delete();

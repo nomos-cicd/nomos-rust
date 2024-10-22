@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
 use crate::{
-    log::{JobLogger, Log, LogLevel},
+    log::{JobLogger, LogLevel},
     script::{Script, ScriptExecutor, ScriptStep},
 };
 
@@ -93,7 +93,7 @@ impl From<&Job> for JobResult {
                 script
                     .steps
                     .iter()
-                    .map(|step| ScriptStep::from(step))
+                    .map(ScriptStep::from)
                     .collect()
             })
             .unwrap();
@@ -107,13 +107,13 @@ impl From<&Job> for JobResult {
 }
 
 impl From<(&Job, &Script)> for JobResult {
-    fn from((job, script): (&Job, &Script)) -> Self {
+    fn from((job, _script): (&Job, &Script)) -> Self {
         let steps: Vec<ScriptStep> = Script::get(&job.script_id)
             .map(|script| {
                 script
                     .steps
                     .iter()
-                    .map(|step| ScriptStep::from(step))
+                    .map(ScriptStep::from)
                     .collect()
             })
             .unwrap();
@@ -171,7 +171,7 @@ impl JobResult {
             let index = self
                 .steps
                 .iter()
-                .position(|step| step.name == current_step_name.to_string());
+                .position(|step| step.name == current_step_name);
             if let Some(index) = index {
                 if index + 1 < self.steps.len() {
                     self.current_step_name =
@@ -192,7 +192,7 @@ impl JobResult {
     pub fn add_log(&mut self, level: LogLevel, message: String) {
         eprintln!("{:?}: {}", level, message);
         if let Some(current_step_name) = &self.current_step_name {
-            let _ = self.logger.log(level, &current_step_name, &message);
+            let _ = self.logger.log(level, current_step_name, &message);
         }
     }
 
@@ -290,19 +290,11 @@ impl Job {
                 || existing_job.script_id != self.script_id
             {
                 self.save();
-                job_result.map(|job_result| {
-                    job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id))
-                });
-            } else {
-                job_result.map(|job_result| {
-                    job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id))
-                });
-            }
+                if let Some(job_result) = job_result { job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id)) }
+            } else if let Some(job_result) = job_result { job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id)) }
         } else {
             self.save();
-            job_result.map(|job_result| {
-                job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id))
-            });
+            if let Some(job_result) = job_result { job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id)) }
         }
     }
 

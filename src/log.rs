@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -56,7 +56,6 @@ impl JobLogger {
         };
 
         let mut file = OpenOptions::new()
-            .write(true)
             .append(true)
             .open(&self.log_filename)
             .map_err(|e| e.to_string())?;

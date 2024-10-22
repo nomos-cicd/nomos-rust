@@ -80,7 +80,7 @@ impl Script {
         let path = default_scripts_location().join(format!("{}.yml", script_id));
         if path.exists() {
             let yaml_script = Script::try_from(path).ok()?;
-            Some(Script::from(yaml_script))
+            Some(yaml_script)
         } else {
             None
         }
@@ -105,22 +105,14 @@ impl Script {
         if let Some(existing_script) = existing_script {
             if existing_script != *self {
                 self.save();
-                job_result.map(|job_result| {
-                    job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id))
-                });
-            } else {
-                job_result.map(|job_result| {
-                    job_result.add_log(
-                        log::LogLevel::Info,
-                        format!("No changes in script {:?}", self.id),
-                    )
-                });
-            }
+                if let Some(job_result) = job_result { job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id)) }
+            } else if let Some(job_result) = job_result { job_result.add_log(
+                log::LogLevel::Info,
+                format!("No changes in script {:?}", self.id),
+            ) }
         } else {
             self.save();
-            job_result.map(|job_result| {
-                job_result.add_log(log::LogLevel::Info, format!("Created script {:?}", self.id))
-            });
+            if let Some(job_result) = job_result { job_result.add_log(log::LogLevel::Info, format!("Created script {:?}", self.id)) }
         }
     }
 
@@ -300,7 +292,7 @@ impl ScriptExecutor for SyncScript {
             param_directory = directory.join(param_directory);
         }
 
-        settings::sync(param_directory, job_result.into())
+        settings::sync(param_directory, job_result)
     }
 }
 
