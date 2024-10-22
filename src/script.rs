@@ -105,24 +105,30 @@ impl Script {
     }
 
     /// Save as YamlScript. Primarily used after creating a new script.
-    pub fn sync(&self, job_result: &mut JobResult) {
+    pub fn sync(&self, job_result: Option<&mut JobResult>) {
+        let self_script = YamlScript::from(self);
         let existing_script = Script::get(self.id.as_str());
+
         if let Some(existing_script) = existing_script {
-            if existing_script.name != self.name
-                || existing_script.parameters != self.parameters
-                || existing_script.steps != self.steps
-            {
-                job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id));
+            let existing_yaml_script = YamlScript::from(&existing_script);
+            if existing_yaml_script != self_script {
                 self.save();
+                job_result.map(|job_result| {
+                    job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id))
+                });
             } else {
-                job_result.add_log(
-                    log::LogLevel::Info,
-                    format!("No changes in script {:?}", self.id),
-                );
+                job_result.map(|job_result| {
+                    job_result.add_log(
+                        log::LogLevel::Info,
+                        format!("No changes in script {:?}", self.id),
+                    )
+                });
             }
         } else {
             self.save();
-            job_result.add_log(log::LogLevel::Info, format!("Created script {:?}", self.id));
+            job_result.map(|job_result| {
+                job_result.add_log(log::LogLevel::Info, format!("Created script {:?}", self.id))
+            });
         }
     }
 
@@ -152,8 +158,6 @@ impl TryFrom<PathBuf> for Script {
     }
 }
 
-
-
 impl Default for ScriptStep {
     fn default() -> Self {
         ScriptStep {
@@ -168,15 +172,13 @@ impl Default for ScriptStep {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Debug)]
-#[derive()]
+#[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 pub struct YamlScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
 }
 
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct YamlScript {
     pub id: String,
     pub name: String,
@@ -353,7 +355,7 @@ impl ScriptExecutor for SyncScript {
             param_directory = directory.join(param_directory);
         }
 
-        settings::sync(param_directory, job_result)
+        settings::sync(param_directory, job_result.into())
     }
 }
 

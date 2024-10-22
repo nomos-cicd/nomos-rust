@@ -83,27 +83,33 @@ impl Credential {
         credentials
     }
 
-    pub fn sync(&self, job_result: &mut JobResult) {
+    pub fn sync(&self, job_result: Option<&mut JobResult>) {
         let existing_credential = Credential::get(self.id.as_str());
         if let Some(existing_credential) = existing_credential {
             if existing_credential != *self {
                 self.save();
-                job_result.add_log(
-                    log::LogLevel::Info,
-                    format!("Updated credential {:?}", self.id),
-                );
+                job_result.map(|job_result| {
+                    job_result.add_log(
+                        log::LogLevel::Info,
+                        format!("Updated credential {:?}", self.id),
+                    )
+                });
             } else {
-                job_result.add_log(
-                    log::LogLevel::Info,
-                    format!("No changes in credential {:?}", self.id),
-                );
+                job_result.map(|job_result| {
+                    job_result.add_log(
+                        log::LogLevel::Info,
+                        format!("No changes in credential {:?}", self.id),
+                    )
+                });
             }
         } else {
             self.save();
-            job_result.add_log(
-                log::LogLevel::Info,
-                format!("Created credential {:?}", self.id),
-            );
+            job_result.map(|job_result| {
+                job_result.add_log(
+                    log::LogLevel::Info,
+                    format!("Created credential {:?}", self.id),
+                )
+            });
         }
     }
 

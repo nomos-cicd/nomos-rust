@@ -1,12 +1,13 @@
 mod credential;
 mod git;
 mod job;
+mod log;
 mod script;
 mod settings;
 mod utils;
-mod log;
 
-use axum::Router;
+use axum::{extract::Path, http::StatusCode, routing, Json, Router};
+use credential::YamlCredential;
 
 #[tokio::main]
 async fn main() {
@@ -14,9 +15,55 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // build our application with a route
-    let app = Router::new();
+    let app = Router::new()
+        .route("/credentials", routing::get(get_credentials))
+        .route("/credentials", routing::post(create_credential))
+        .route("/credentials/:id", routing::delete(delete_credential))
+        .route("/scripts", routing::get(get_scripts))
+        .route("/scripts", routing::post(create_script))
+        .route("/scripts/:id", routing::delete(delete_script));
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn get_credentials() -> Json<Vec<credential::Credential>> {
+    let credentials = credential::Credential::get_all();
+    Json(credentials)
+}
+
+async fn create_credential(Json(credential): Json<YamlCredential>) -> Json<credential::Credential> {
+    let credential = credential::Credential::try_from(credential).unwrap();
+    credential.sync(None);
+    Json(credential)
+}
+
+async fn delete_credential(Path(id): Path<String>) -> StatusCode {
+    let credential = credential::Credential::get(id.as_str());
+    if let None = credential {
+        return StatusCode::NOT_FOUND;
+    }
+    credential.unwrap().delete();
+    StatusCode::NO_CONTENT
+}
+
+async fn get_scripts() -> Json<Vec<script::Script>> {
+    let scripts = script::Script::get_all();
+    Json(scripts)
+}
+
+async fn create_script(Json(script): Json<script::YamlScript>) -> Json<script::Script> {
+    let script = script::Script::try_from(script).unwrap();
+    script.sync(None);
+    Json(script)
+}
+
+async fn delete_script(Path(id): Path<String>) -> StatusCode {
+    let script = script::Script::get(id.as_str());
+    if let None = script {
+        return StatusCode::NOT_FOUND;
+    }
+    script.unwrap().delete();
+    StatusCode::NO_CONTENT
 }

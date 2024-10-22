@@ -27,7 +27,7 @@ impl Settings {
                 continue;
             }
 
-            credential.unwrap().sync(job_result);
+            credential.unwrap().sync(job_result.into());
             credential_ids.push(yaml_credential.id.clone());
         }
 
@@ -62,7 +62,7 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         let entry = entry.unwrap();
         let path = entry.path();
         let script = Script::try_from(path).unwrap();
-        script.sync(job_result);
+        script.sync(job_result.into());
         script_ids.push(script.id.clone());
     }
     let scripts = Script::get_all();
@@ -82,7 +82,7 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         let entry = entry.unwrap();
         let path = entry.path();
         let job = Job::try_from(path).unwrap();
-        job.sync(job_result);
+        job.sync(job_result.into());
         job_ids.push(job.id.clone());
     }
     let jobs = Job::get_all();

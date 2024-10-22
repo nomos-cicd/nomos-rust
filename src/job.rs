@@ -108,9 +108,7 @@ impl From<&Job> for JobResult {
     fn from(job: &Job) -> Self {
         JobResult {
             job_id: job.id.clone(),
-            steps: Script::get(&job.script_id)
-                .unwrap()
-                .steps.to_vec(),
+            steps: Script::get(&job.script_id).unwrap().steps.to_vec(),
             current_step: Script::get(&job.script_id).unwrap().steps.first().cloned(),
             ..Default::default()
         }
@@ -262,7 +260,7 @@ impl Job {
         jobs
     }
 
-    pub fn sync(&self, job_result: &mut JobResult) {
+    pub fn sync(&self, job_result: Option<&mut JobResult>) {
         let existing_job = Job::get(self.id.as_str());
         if let Some(existing_job) = existing_job {
             if existing_job.name != self.name
@@ -271,13 +269,19 @@ impl Job {
                 || existing_job.script_id != self.script_id
             {
                 self.save();
-                job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id));
+                job_result.map(|job_result| {
+                    job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id))
+                });
             } else {
-                job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id));
+                job_result.map(|job_result| {
+                    job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id))
+                });
             }
         } else {
             self.save();
-            job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id));
+            job_result.map(|job_result| {
+                job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id))
+            });
         }
     }
 
