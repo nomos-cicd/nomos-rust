@@ -1,9 +1,13 @@
 use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
-use crate::script::{Script, ScriptExecutor, ScriptStep};
+use crate::{
+    log::{JobLogger, Log, LogLevel},
+    script::{Script, ScriptExecutor, ScriptStep},
+};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
 pub struct ManualTriggerParameter {}
@@ -52,6 +56,7 @@ pub struct JobResult {
     pub started_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
+    logger: JobLogger,
 }
 
 impl Default for Job {
@@ -71,8 +76,10 @@ impl Default for Job {
 
 impl Default for JobResult {
     fn default() -> Self {
+        let id = Uuid::new_v4().to_string();
+        let logger = JobLogger::new(id.clone(), id.clone()).unwrap();
         JobResult {
-            id: String::new(),
+            id,
             job_id: String::new(),
             is_success: true,
             steps: vec![],
@@ -80,6 +87,7 @@ impl Default for JobResult {
             started_at: Utc::now(),
             updated_at: Utc::now(),
             finished_at: None,
+            logger,
         }
     }
 }
@@ -115,7 +123,6 @@ impl From<&Job> for JobResult {
 impl From<(&Job, &Script)> for JobResult {
     fn from((job, script): (&Job, &Script)) -> Self {
         JobResult {
-            id: "1".to_string(),
             job_id: job.id.clone(),
             steps: script.steps.iter().cloned().collect(),
             current_step: script.steps.get(0).cloned(),
@@ -214,6 +221,19 @@ impl JobResult {
             panic!("No current step");
         }
     }
+
+    pub fn add_log(&mut self, level: LogLevel, message: String) -> Result<(), String> {
+        eprintln!("{:?}: {}", level, message);
+        if let Some(current_step) = &self.current_step {
+            self.logger.log(level, &current_step.name, &message)
+        } else {
+            Ok(()) // Or return an error if no current step
+        }
+    }
+
+    pub fn get_logs(&self) -> Result<Vec<Log>, String> {
+        self.logger.get_logs()
+    }
 }
 
 impl Job {
@@ -245,7 +265,7 @@ impl Job {
         jobs
     }
 
-    pub fn sync(&self) {
+    pub fn sync(&self, job_result: &mut JobResult) {
         let existing_job = Job::get(self.id.as_str());
         if let Some(existing_job) = existing_job {
             if existing_job.name != self.name
@@ -253,14 +273,14 @@ impl Job {
                 || existing_job.triggers != self.triggers
                 || existing_job.script_id != self.script_id
             {
-                eprintln!("Updating job {:?}", existing_job.id);
                 self.save();
+                job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id));
             } else {
-                eprintln!("Existing job {:?}", existing_job.id);
+                job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id));
             }
         } else {
-            eprintln!("New job {:?}", self.id);
             self.save();
+            job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id));
         }
     }
 
@@ -314,18 +334,23 @@ impl Job {
             merged_parameters_with_prefix.insert(format!("$parameters.{}", key), value);
         }
 
-        let mut job_result = Box::new(JobResult::from((self, script)));
+        let mut job_result = JobResult::from((self, script));
         let directory = default_job_results_location().join(&job_result.id);
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
 
-        job_result.start_step();
+        let _ = &job_result.start_step();
         while !job_result.finished_at.is_some() {
-            let current_step = job_result.current_step.as_ref().unwrap();
+            // Clone current_step to avoid holding an immutable borrow of job_result
+            let current_step = job_result.current_step.as_ref().unwrap().clone();
+            let step_name = current_step.name.clone();
+
             let result = current_step.execute(
                 &mut merged_parameters_with_prefix,
                 directory.clone(),
-                current_step.name.as_str(),
+                step_name.as_str(),
+                &mut job_result,
             );
+
             if result.is_err() {
                 job_result.finish_step(false);
                 break;
@@ -333,7 +358,7 @@ impl Job {
             job_result.finish_step(true);
         }
 
-        Ok(*job_result)
+        Ok(job_result)
     }
 }
 

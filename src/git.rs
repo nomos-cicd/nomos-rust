@@ -4,6 +4,7 @@ use tempfile::NamedTempFile;
 
 use crate::{
     credential::{Credential, CredentialType},
+    job::JobResult,
     utils::{execute_command, execute_command_with_env},
 };
 
@@ -12,12 +13,14 @@ pub fn git_clone(
     branch: &str,
     directory: PathBuf,
     credential_id: Option<&str>,
+    job_result: &mut JobResult,
 ) -> Result<(), String> {
     if cfg!(target_os = "windows") {
         // Workaround for local
         execute_command(
             &format!("git clone -b {} {}", branch, url),
             directory.clone(),
+            job_result,
         )?;
         Ok(())
     } else if credential_id.is_some() {
@@ -28,6 +31,7 @@ pub fn git_clone(
             execute_command(
                 &format!("git clone -b {} {}", branch, url),
                 directory.clone(),
+                job_result,
             )?;
             let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
             let tmp_path = tmp_file.path();
@@ -36,6 +40,7 @@ pub fn git_clone(
             execute_command(
                 &format!("chmod 400 {}", tmp_path.display()),
                 directory.clone(),
+                job_result,
             )?;
 
             let env = vec![(
@@ -46,6 +51,7 @@ pub fn git_clone(
                 &format!("git clone -b {} {}", branch, url),
                 directory.clone(),
                 env,
+                job_result,
             )?;
 
             Ok(())

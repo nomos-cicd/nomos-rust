@@ -5,8 +5,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::git::git_clone;
-use crate::settings;
+use crate::job::JobResult;
 use crate::utils::execute_command;
+use crate::{log, settings};
 
 pub trait ScriptExecutor {
     fn execute(
@@ -14,6 +15,7 @@ pub trait ScriptExecutor {
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
         step_name: &str,
+        job_result: &mut JobResult,
     ) -> Result<(), String>;
 }
 
@@ -103,21 +105,24 @@ impl Script {
     }
 
     /// Save as YamlScript. Primarily used after creating a new script.
-    pub fn sync(&self) {
+    pub fn sync(&self, job_result: &mut JobResult) {
         let existing_script = Script::get(self.id.as_str());
         if let Some(existing_script) = existing_script {
             if existing_script.name != self.name
                 || existing_script.parameters != self.parameters
                 || existing_script.steps != self.steps
             {
-                eprintln!("Updated script {:?}", self.id);
+                job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id));
                 self.save();
             } else {
-                eprintln!("Existing script {:?}", self.id);
+                job_result.add_log(
+                    log::LogLevel::Info,
+                    format!("No changes in script {:?}", self.id),
+                );
             }
         } else {
-            eprintln!("New script {:?}", self.id);
             self.save();
+            job_result.add_log(log::LogLevel::Info, format!("Created script {:?}", self.id));
         }
     }
 
@@ -254,6 +259,7 @@ impl ScriptExecutor for BashScript {
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
         step_name: &str,
+        job_result: &mut JobResult,
     ) -> Result<(), String> {
         let mut replaced_code = self.code.clone();
         for (key, value) in parameters.iter() {
@@ -276,7 +282,7 @@ impl ScriptExecutor for BashScript {
             cmd_code = cmd_code[..cmd_code.len() - 3].to_string();
         }
 
-        execute_command(&cmd_code, directory)
+        execute_command(&cmd_code, directory, job_result)
     }
 }
 
@@ -286,6 +292,7 @@ impl ScriptExecutor for GitCloneScript {
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
         step_name: &str,
+        job_result: &mut JobResult,
     ) -> Result<(), String> {
         let mut url = self.url.clone();
         let is_variable = url.starts_with("$parameters.");
@@ -316,6 +323,7 @@ impl ScriptExecutor for GitCloneScript {
             branch.unwrap().as_str(),
             directory.clone(),
             credential_id.as_deref(),
+            job_result,
         )
         .map_err(|e| e.to_string())?;
 
@@ -339,6 +347,7 @@ impl ScriptExecutor for SyncScript {
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
         step_name: &str,
+        job_result: &mut JobResult,
     ) -> Result<(), String> {
         let is_variable = self.directory.starts_with("$");
         let mut param_directory = if is_variable {
@@ -360,7 +369,7 @@ impl ScriptExecutor for SyncScript {
             param_directory = directory.join(param_directory);
         }
 
-        settings::sync(param_directory)
+        settings::sync(param_directory, job_result)
     }
 }
 
@@ -370,11 +379,14 @@ impl ScriptExecutor for ScriptType {
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
         step_name: &str,
+        job_result: &mut JobResult,
     ) -> Result<(), String> {
         match self {
-            ScriptType::Bash(bash) => bash.execute(parameters, directory, step_name),
-            ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory, step_name),
-            ScriptType::Sync(sync) => sync.execute(parameters, directory, step_name),
+            ScriptType::Bash(bash) => bash.execute(parameters, directory, step_name, job_result),
+            ScriptType::GitClone(git_clone) => {
+                git_clone.execute(parameters, directory, step_name, job_result)
+            }
+            ScriptType::Sync(sync) => sync.execute(parameters, directory, step_name, job_result),
         }
     }
 }
@@ -385,9 +397,10 @@ impl ScriptExecutor for ScriptStep {
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
         step_name: &str,
+        job_result: &mut JobResult,
     ) -> Result<(), String> {
         for value in self.values.iter() {
-            value.execute(parameters, directory.clone(), step_name)?;
+            value.execute(parameters, directory.clone(), step_name, job_result)?;
         }
         Ok(())
     }

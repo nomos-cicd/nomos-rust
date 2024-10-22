@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::{job::JobResult, log};
+
 #[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub struct TextCredentialParameter {
     pub value: String,
@@ -81,18 +83,27 @@ impl Credential {
         credentials
     }
 
-    pub fn sync(&self) {
+    pub fn sync(&self, job_result: &mut JobResult) {
         let existing_credential = Credential::get(self.id.as_str());
         if let Some(existing_credential) = existing_credential {
             if existing_credential != *self {
-                eprintln!("Updated credential {:?}", self.id);
                 self.save();
+                job_result.add_log(
+                    log::LogLevel::Info,
+                    format!("Updated credential {:?}", self.id),
+                );
             } else {
-                eprintln!("Existing credential {:?}", self.id);
+                job_result.add_log(
+                    log::LogLevel::Info,
+                    format!("No changes in credential {:?}", self.id),
+                );
             }
         } else {
-            eprintln!("New credential {:?}", self.id);
             self.save();
+            job_result.add_log(
+                log::LogLevel::Info,
+                format!("Created credential {:?}", self.id),
+            );
         }
     }
 

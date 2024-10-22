@@ -1,6 +1,16 @@
-use std::{io::{BufRead, BufReader}, path::PathBuf, process::{Child, Command, Stdio}};
+use std::{
+    io::{BufRead, BufReader},
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+};
 
-pub fn execute_command(command: &str, directory: PathBuf) -> Result<(), String> {
+use crate::{job::JobResult, log::LogLevel};
+
+pub fn execute_command(
+    command: &str,
+    directory: PathBuf,
+    job_result: &mut JobResult,
+) -> Result<(), String> {
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
         cmd.args(&["/C", command]);
@@ -19,14 +29,18 @@ pub fn execute_command(command: &str, directory: PathBuf) -> Result<(), String> 
             .map_err(|e| e.to_string())?
     };
 
-    execute_script(child)
+    execute_script(child, job_result)
 }
 
-pub fn execute_command_with_env(command: &str, directory: PathBuf, env: Vec<(String, String)>) -> Result<(), String> {
+pub fn execute_command_with_env(
+    command: &str,
+    directory: PathBuf,
+    env: Vec<(String, String)>,
+    job_result: &mut JobResult,
+) -> Result<(), String> {
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
-        cmd.args(&["/C", command])
-            .current_dir(directory);
+        cmd.args(&["/C", command]).current_dir(directory);
         for (key, value) in env {
             cmd.env(key, value);
         }
@@ -36,8 +50,7 @@ pub fn execute_command_with_env(command: &str, directory: PathBuf, env: Vec<(Str
             .map_err(|e| e.to_string())?
     } else {
         let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(command)
-            .current_dir(directory);
+        cmd.arg("-c").arg(command).current_dir(directory);
         for (key, value) in env {
             cmd.env(key, value);
         }
@@ -47,10 +60,10 @@ pub fn execute_command_with_env(command: &str, directory: PathBuf, env: Vec<(Str
             .map_err(|e| e.to_string())?
     };
 
-    execute_script(child)
+    execute_script(child, job_result)
 }
 
-pub fn execute_script(mut child: Child) -> Result<(), String> {
+pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<(), String> {
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
 
@@ -58,24 +71,19 @@ pub fn execute_script(mut child: Child) -> Result<(), String> {
     let stderr_reader = BufReader::new(stderr);
 
     // Log stdout in real-time
-    std::thread::spawn(move || {
-        for line in stdout_reader.lines() {
-            if let Ok(line) = line {
-                eprintln!("STDOUT: {}", line);
-            }
+    for line in stdout_reader.lines() {
+        if let Ok(line) = line {
+            job_result.add_log(LogLevel::Info, line.clone())?;
         }
-    });
+    }
 
     // Log stderr in real-time
-    std::thread::spawn(move || {
-        for line in stderr_reader.lines() {
-            if let Ok(line) = line {
-                eprintln!("STDERR: {}", line);
-            }
+    for line in stderr_reader.lines() {
+        if let Ok(line) = line {
+            job_result.add_log(LogLevel::Error, line.clone())?;
         }
-    });
+    }
 
-    // Wait for the child process to finish
     let status = child.wait().map_err(|e| e.to_string())?;
 
     if status.success() {

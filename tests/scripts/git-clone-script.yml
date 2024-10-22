@@ -9,11 +9,16 @@ parameters:
     description: Git credential ID
     required: false
     type: string
+  - name: git_clone_branch
+    description: Git clone branch
+    required: true
+    type: string
 steps:
   - name: Clone
     values:
       - type: git-clone
         url: $parameters.git_clone_url
+        branch: $parameters.git_clone_branch
         credential_id: $parameters.git_credential_id
   - name: List files
     values:

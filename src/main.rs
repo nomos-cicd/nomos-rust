@@ -4,10 +4,9 @@ mod job;
 mod script;
 mod settings;
 mod utils;
+mod log;
 
-use axum::{
-    Router,
-};
+use axum::Router;
 
 #[tokio::main]
 async fn main() {

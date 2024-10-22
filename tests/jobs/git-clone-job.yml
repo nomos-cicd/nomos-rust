@@ -3,6 +3,8 @@ name: Clone Job
 parameters:
   - name: git_clone_url
     default: "git@github.com:requizm/system-docs.git"
+  - name: git_clone_branch
+    default: "master"
 triggers: []
 script_id: git-clone-script
 read_only: false
