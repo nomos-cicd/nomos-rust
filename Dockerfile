@@ -17,17 +17,22 @@ COPY --from=deps-builder /app/target target
 COPY --from=deps-builder /app/Cargo.toml /app/Cargo.lock ./
 # Copy the actual source code
 COPY src src
-# Build the application
-RUN cargo build --release
+# Build the application with static linking
+RUN rustup target add x86_64-unknown-linux-musl && \
+    RUSTFLAGS='-C target-feature=+crt-static' cargo build --release --target x86_64-unknown-linux-musl
 
 # Stage 3: Create the final image
 FROM docker:25.0.5-dind
 
-# Install any necessary runtime dependencies
+# Install necessary runtime dependencies
 RUN apk add --no-cache \
     openssl \
     ca-certificates \
-    tzdata
+    tzdata \
+    bash \
+    musl-dev \
+    libc6-compat \
+    gcompat
 
 # Create a non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -35,8 +40,11 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Set working directory
 WORKDIR /app
 
-# Copy the binary from builder
-COPY --from=app-builder /app/target/release/nomos-rust .
+# Copy the statically linked binary
+COPY --from=app-builder /app/target/x86_64-unknown-linux-musl/release/nomos-rust .
+
+# Show binary dependencies
+RUN ldd nomos-rust || true
 
 # Change ownership of the binary
 RUN chown -R appuser:appgroup /app
@@ -44,5 +52,8 @@ RUN chown -R appuser:appgroup /app
 # Switch to non-root user
 USER appuser
 
-# Set the entrypoint
-ENTRYPOINT ["./nomos-rust"]
+# Make sure the binary is executable
+RUN chmod +x /app/nomos-rust
+
+# Add debug command
+CMD ["sh", "-c", "pwd && ls -la && exec /app/nomos-rust"]
