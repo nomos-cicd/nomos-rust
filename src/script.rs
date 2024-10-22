@@ -47,7 +47,7 @@ pub enum ScriptType {
     Sync(SyncScript),
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct ScriptParameter {
     pub name: String,
     pub description: String,
@@ -136,7 +136,7 @@ impl Script {
 
     pub fn delete(&self) {
         let path = default_scripts_location().join(format!("{}.yml", self.id));
-        std::fs::remove_file(&path)
+        std::fs::remove_file(path)
             .map_err(|e| e.to_string())
             .unwrap();
     }
@@ -152,16 +152,7 @@ impl TryFrom<PathBuf> for Script {
     }
 }
 
-impl Default for ScriptParameter {
-    fn default() -> Self {
-        ScriptParameter {
-            name: String::new(),
-            description: String::new(),
-            required: false,
-            default: None,
-        }
-    }
-}
+
 
 impl Default for ScriptStep {
     fn default() -> Self {
@@ -177,20 +168,13 @@ impl Default for ScriptStep {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive()]
 pub struct YamlScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
 }
 
-impl Default for YamlScriptStep {
-    fn default() -> Self {
-        YamlScriptStep {
-            name: String::new(),
-            values: vec![],
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct YamlScript {
@@ -258,7 +242,7 @@ impl ScriptExecutor for BashScript {
         &self,
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
-        step_name: &str,
+        _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
         let mut replaced_code = self.code.clone();
@@ -346,10 +330,10 @@ impl ScriptExecutor for SyncScript {
         &self,
         parameters: &mut HashMap<String, String>,
         directory: PathBuf,
-        step_name: &str,
+        _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
-        let is_variable = self.directory.starts_with("$");
+        let is_variable = self.directory.starts_with('$');
         let mut param_directory = if is_variable {
             PathBuf::from(
                 parameters

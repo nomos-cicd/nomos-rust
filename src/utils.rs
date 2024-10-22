@@ -13,7 +13,7 @@ pub fn execute_command(
 ) -> Result<(), String> {
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
-        cmd.args(&["/C", command]);
+        cmd.args(["/C", command]);
         cmd.current_dir(directory);
         cmd.stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -40,7 +40,7 @@ pub fn execute_command_with_env(
 ) -> Result<(), String> {
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
-        cmd.args(&["/C", command]).current_dir(directory);
+        cmd.args(["/C", command]).current_dir(directory);
         for (key, value) in env {
             cmd.env(key, value);
         }

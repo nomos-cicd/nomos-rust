@@ -96,7 +96,7 @@ impl TryFrom<PathBuf> for Job {
     type Error = String;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = File::open(&path).map_err(|_| "Could not open file")?;
+        let file = File::open(path).map_err(|_| "Could not open file")?;
         let reader = BufReader::new(file);
         let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
         let yaml_job: YamlJob = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
@@ -110,11 +110,8 @@ impl From<&Job> for JobResult {
             job_id: job.id.clone(),
             steps: Script::get(&job.script_id)
                 .unwrap()
-                .steps
-                .iter()
-                .cloned()
-                .collect(),
-            current_step: Script::get(&job.script_id).unwrap().steps.get(0).cloned(),
+                .steps.to_vec(),
+            current_step: Script::get(&job.script_id).unwrap().steps.first().cloned(),
             ..Default::default()
         }
     }
@@ -124,8 +121,8 @@ impl From<(&Job, &Script)> for JobResult {
     fn from((job, script): (&Job, &Script)) -> Self {
         JobResult {
             job_id: job.id.clone(),
-            steps: script.steps.iter().cloned().collect(),
-            current_step: script.steps.get(0).cloned(),
+            steps: script.steps.to_vec(),
+            current_step: script.steps.first().cloned(),
             ..Default::default()
         }
     }
@@ -162,7 +159,7 @@ impl TryFrom<PathBuf> for YamlJob {
     type Error = String;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = File::open(&path).map_err(|_| "Could not open file")?;
+        let file = File::open(path).map_err(|_| "Could not open file")?;
         let reader = BufReader::new(file);
         let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
         let yaml_job: YamlJob = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
@@ -185,7 +182,7 @@ impl From<&Job> for YamlJob {
 
 impl JobResult {
     pub fn start_step(&mut self) {
-        if let Some(current_step) = &self.current_step {
+        if let Some(_current_step) = &self.current_step {
             self.current_step.as_mut().unwrap().start();
         } else {
             panic!("No current step");
@@ -194,7 +191,7 @@ impl JobResult {
 
     pub fn finish_step(&mut self, is_success: bool) {
         let now: DateTime<Utc> = Utc::now();
-        if let Some(mut current_step) = self.current_step.as_mut() {
+        if let Some(current_step) = self.current_step.as_mut() {
             current_step.finish(is_success);
             if !is_success {
                 self.is_success = false;
@@ -294,7 +291,7 @@ impl Job {
 
     pub fn delete(&self) {
         let path = PathBuf::from("jobs").join(format!("{}.yaml", self.id));
-        std::fs::remove_file(&path)
+        std::fs::remove_file(path)
             .map_err(|e| e.to_string())
             .unwrap();
     }
@@ -339,7 +336,7 @@ impl Job {
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
 
         let _ = &job_result.start_step();
-        while !job_result.finished_at.is_some() {
+        while job_result.finished_at.is_none() {
             // Clone current_step to avoid holding an immutable borrow of job_result
             let current_step = job_result.current_step.as_ref().unwrap().clone();
             let step_name = current_step.name.clone();

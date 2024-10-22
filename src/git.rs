@@ -35,7 +35,7 @@ pub fn git_clone(
             )?;
             let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
             let tmp_path = tmp_file.path();
-            let _ = std::fs::write(tmp_path, &ssh_credential.private_key);
+            let _ = std::fs::write(tmp_path, ssh_credential.private_key);
 
             execute_command(
                 &format!("chmod 400 {}", tmp_path.display()),

@@ -109,7 +109,7 @@ impl Credential {
 
     fn save(&self) {
         let path = default_credentials_location().join(format!("{}.yml", self.id));
-        let file = std::fs::File::create(&path)
+        let file = std::fs::File::create(path)
             .map_err(|e| e.to_string())
             .unwrap();
         let writer = std::io::BufWriter::new(file);
@@ -120,7 +120,7 @@ impl Credential {
 
     pub fn delete(&self) {
         let path = default_credentials_location().join(format!("{}.yml", self.id));
-        std::fs::remove_file(&path)
+        std::fs::remove_file(path)
             .map_err(|e| e.to_string())
             .unwrap();
     }
@@ -163,7 +163,7 @@ impl TryFrom<PathBuf> for YamlCredential {
     type Error = String;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = std::fs::File::open(&path).map_err(|_| "Could not open file")?;
+        let file = std::fs::File::open(path).map_err(|_| "Could not open file")?;
         let reader = std::io::BufReader::new(file);
         let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
 
