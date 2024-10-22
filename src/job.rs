@@ -44,12 +44,12 @@ pub struct Job {
 pub struct JobResult {
     pub id: String,
     pub job_id: String,
-    pub is_finished: bool,
     pub is_success: bool,
     pub steps: Vec<ScriptStep>,
     pub current_step: Option<ScriptStep>,
-    pub created_at: DateTime<Utc>,
+    pub started_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
 }
 
 impl Default for Job {
@@ -71,12 +71,12 @@ impl Default for JobResult {
         JobResult {
             id: String::new(),
             job_id: String::new(),
-            is_finished: false,
             is_success: true,
             steps: vec![],
             current_step: None,
-            created_at: Utc::now(),
+            started_at: Utc::now(),
             updated_at: Utc::now(),
+            finished_at: None,
         }
     }
 }
@@ -92,6 +92,17 @@ impl From<&Job> for JobResult {
                 .cloned()
                 .collect(),
             current_step: Script::get(&job.script_id).unwrap().steps.get(0).cloned(),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<(&Job, &Script)> for JobResult {
+    fn from((job, script): (&Job, &Script)) -> Self {
+        JobResult {
+            job_id: job.id.clone(),
+            steps: script.steps.iter().cloned().collect(),
+            current_step: script.steps.get(0).cloned(),
             ..Default::default()
         }
     }
@@ -172,11 +183,13 @@ impl JobResult {
     }
 
     pub fn finish_step(&mut self, is_success: bool) {
-        if let Some(mut current_step) = self.current_step.take() {
+        let now: DateTime<Utc> = Utc::now();
+        if let Some(mut current_step) = self.current_step.as_mut() {
             current_step.finish(is_success);
             if !is_success {
                 self.is_success = false;
-                self.current_step = Some(current_step);
+                self.updated_at = now;
+                self.finished_at = Some(now);
                 return;
             }
 
@@ -187,11 +200,13 @@ impl JobResult {
             if let Some(index) = index {
                 if index + 1 < self.steps.len() {
                     self.current_step = self.steps.get(index + 1).cloned();
+                    self.updated_at = now;
                 } else {
-                    self.is_finished = true;
+                    let now: DateTime<Utc> = Utc::now();
+                    self.updated_at = now;
+                    self.finished_at = Some(now);
                 }
             }
-            self.current_step = Some(current_step);
         } else {
             panic!("No current step");
         }
@@ -200,18 +215,19 @@ impl JobResult {
 
 impl Job {
     pub fn execute(&self, parameters: HashMap<String, String>) -> JobResult {
-        self.execute_with_script(parameters, self.script_id.clone())
+        let script = Script::get(&self.script_id).expect("Could not get script");
+        self.execute_with_script(parameters, &script)
     }
 
     pub fn execute_with_script(
         &self,
         parameters: HashMap<String, String>,
-        script_id: String,
+        script: &Script,
     ) -> JobResult {
-        let mut job_result = Box::new(JobResult::from(self.clone()));
+        let mut job_result = Box::new(JobResult::from((self, script)));
 
         job_result.start_step();
-        while !job_result.is_finished {
+        while !job_result.finished_at.is_some() {
             let current_step = job_result.current_step.as_ref().unwrap();
             let result = current_step.execute(parameters.clone());
             if result.is_err() {

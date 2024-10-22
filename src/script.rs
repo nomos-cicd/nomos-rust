@@ -61,6 +61,16 @@ impl Script {
             None
         }
     }
+
+    pub fn get_from_path(path_str: &str) -> Option<Self> {
+        let path = PathBuf::from(path_str);
+        if path.exists() {
+            let yaml_script = YamlScript::try_from(path).ok()?;
+            Some(Script::from(yaml_script))
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for ScriptParameter {

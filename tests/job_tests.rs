@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use nomos_rust::job::{Job, TriggerType, YamlJob, YamlTrigger};
+use nomos_rust::script::Script;
 
 #[test]
 fn create_job() {
@@ -45,8 +46,11 @@ fn execute_job() {
     let path_buf = PathBuf::from("tests/test-job.yml");
     let yaml_job = YamlJob::try_from(path_buf).unwrap();
     let job = Job::try_from(yaml_job).unwrap();
-    let result = job.execute(Default::default());
-    assert!(result.is_finished);
+    let script = Script::get_from_path("tests/scripts/test-script.yml").unwrap();
+    let result = job.execute_with_script(Default::default(), &script);
+    assert!(result.finished_at.is_some());
     assert!(result.is_success);
     assert_eq!(result.steps.len(), 1);
+    assert_eq!(result.current_step.unwrap().name, "Test Step");
+    assert!(result.finished_at.unwrap() > result.started_at);
 }
