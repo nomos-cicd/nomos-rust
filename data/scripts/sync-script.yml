@@ -1,0 +1,26 @@
+id: sync-script
+name: Sync Script
+parameters:
+  - name: git_clone_url
+    description: Git clone URL
+    required: true
+    type: string
+  - name: git_credential_id
+    description: Git credential ID
+    required: false
+    type: string
+  - name: git_branch
+    description: Git branch
+    required: false
+    type: string
+steps:
+  - name: Clone
+    values:
+      - type: git-clone
+        url: $parameters.git_clone_url
+        branch: $parameters.git_branch
+        credential_id: $parameters.git_credential_id
+  - name: List files
+    values:
+      - type: sync
+        directory: $steps.Clone.git-clone.directory

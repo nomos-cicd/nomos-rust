@@ -25,6 +25,7 @@ pub struct BashScript {
 pub struct GitCloneScript {
     pub url: String,
     pub credential_id: Option<String>,
+    pub branch: Option<String>,
 }
 
 /// Scans directory for credential, script and job files and syncs them with the database.
@@ -300,7 +301,23 @@ impl ScriptExecutor for GitCloneScript {
             credential_id = parameters.get(credential_id.as_ref().unwrap()).cloned();
         }
 
-        git_clone(&url, directory.clone(), credential_id.as_deref()).map_err(|e| e.to_string())?;
+        let mut branch = self.branch.clone();
+        let is_variable = branch
+            .as_ref()
+            .map_or(false, |b| b.starts_with("$parameters."));
+        if is_variable {
+            branch = branch.and_then(|b| parameters.get(&b).cloned());
+        } else if branch.is_none() {
+            branch = "main".to_string().into();
+        }
+
+        git_clone(
+            &url,
+            branch.unwrap().as_str(),
+            directory.clone(),
+            credential_id.as_deref(),
+        )
+        .map_err(|e| e.to_string())?;
 
         let mut cloned_dir = directory.clone().join(url.split('/').last().unwrap());
         if cloned_dir.to_str().unwrap().ends_with(".git") {

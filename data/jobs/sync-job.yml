@@ -1,0 +1,12 @@
+id: sync-job
+name: Sync Job
+parameters:
+  - name: git_clone_url
+    default: "git@github.com:requizm/nomos-pipeline.git"
+  - name: git_credential_id
+    default: "git-credential"
+  - name: git_branch
+    default: "main"
+triggers: []
+script_id: git-clone-script
+read_only: true

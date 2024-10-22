@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use nomos_rust::settings;
 
-
 #[test]
 fn sync() {
     let path = PathBuf::from("tests");
