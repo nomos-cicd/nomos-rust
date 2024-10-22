@@ -2,20 +2,19 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_variant::to_variant_name;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub struct TextCredentialParameter {
     pub value: String,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub struct SshCredentialParameter {
     pub username: String,
     pub private_key: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum CredentialType {
     #[serde(rename = "text")]
@@ -31,6 +30,12 @@ pub struct Credential {
     pub read_only: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl PartialEq for Credential {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.value == other.value && self.read_only == other.read_only
+    }
 }
 
 impl Default for Credential {
@@ -51,8 +56,12 @@ impl Credential {
     pub fn get(credential_id: &str) -> Option<Self> {
         let path = default_credentials_location().join(format!("{}.yml", credential_id));
         if path.exists() {
-            let content = std::fs::read_to_string(&path).expect("Could not read file");
-            serde_yaml::from_str(&content).expect("Could not parse file")
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .unwrap();
+            serde_yaml::from_str(&content)
+                .map_err(|e| e.to_string())
+                .ok()
         } else {
             None
         }
@@ -61,10 +70,12 @@ impl Credential {
     pub fn get_all() -> Vec<Self> {
         let path = default_credentials_location();
         let mut credentials = Vec::new();
-        for entry in std::fs::read_dir(path).expect("Could not read directory") {
-            let entry = entry.expect("Could not read entry");
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
+            let entry = entry.map_err(|e| e.to_string()).unwrap();
             let path = entry.path();
-            let credential = Credential::try_from(path).expect("Could not convert to credential");
+            let credential = Credential::try_from(path)
+                .map_err(|e| e.to_string())
+                .unwrap();
             credentials.push(credential);
         }
         credentials
@@ -73,27 +84,34 @@ impl Credential {
     pub fn sync(&self) {
         let existing_credential = Credential::get(self.id.as_str());
         if let Some(existing_credential) = existing_credential {
-            let enum_type = to_variant_name(&self.value).unwrap();
-            let existing_enum_type = to_variant_name(&existing_credential.value).unwrap();
-            if enum_type != existing_enum_type {
-                eprintln!("Replacing credential {} with new type", self.id);
+            if existing_credential != *self {
+                eprintln!("Updated credential {:?}", self.id);
                 self.save();
+            } else {
+                eprintln!("Existing credential {:?}", self.id);
             }
         } else {
+            eprintln!("New credential {:?}", self.id);
             self.save();
         }
     }
 
     fn save(&self) {
         let path = default_credentials_location().join(format!("{}.yml", self.id));
-        let file = std::fs::File::create(&path).expect("Could not create file");
+        let file = std::fs::File::create(&path)
+            .map_err(|e| e.to_string())
+            .unwrap();
         let writer = std::io::BufWriter::new(file);
-        serde_yaml::to_writer(writer, self).expect("Could not write to file");
+        serde_yaml::to_writer(writer, self)
+            .map_err(|e| e.to_string())
+            .unwrap();
     }
 
     pub fn delete(&self) {
         let path = default_credentials_location().join(format!("{}.yml", self.id));
-        std::fs::remove_file(&path).expect("Could not delete file");
+        std::fs::remove_file(&path)
+            .map_err(|e| e.to_string())
+            .unwrap();
     }
 }
 
@@ -156,11 +174,13 @@ impl TryFrom<PathBuf> for Credential {
 
 pub fn default_credentials_location() -> PathBuf {
     let path = if cfg!(target_os = "windows") {
-        let appdata = std::env::var("APPDATA").expect("Could not get APPDATA");
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string()).unwrap();
         PathBuf::from(appdata).join("nomos").join("credentials")
     } else {
         PathBuf::from("/var/lib/nomos/credentials")
     };
-    std::fs::create_dir_all(&path).expect("Could not create credentials directory");
+    std::fs::create_dir_all(&path)
+        .map_err(|e| e.to_string())
+        .unwrap();
     path
 }

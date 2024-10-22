@@ -10,13 +10,13 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub yaml_credentials: Vec<YamlCredential>,
+    pub credentials: Vec<YamlCredential>,
 }
 
 impl Settings {
     pub fn sync(&self) {
         let mut credential_ids: Vec<String> = Vec::new();
-        for yaml_credential in &self.yaml_credentials {
+        for yaml_credential in &self.credentials {
             let credential = Credential::try_from(yaml_credential);
             if let Err(e) = credential {
                 eprintln!("Error applying credential: {}", e);
@@ -47,24 +47,42 @@ impl TryFrom<PathBuf> for Settings {
     }
 }
 
-pub fn sync(directory: PathBuf) {
-    let settings_path = directory.join("settings.yaml");
+pub fn sync(directory: PathBuf) -> Result<(), String> {
+    let settings_path = directory.join("settings.yml");
     let settings = Settings::try_from(settings_path).unwrap();
     settings.sync();
 
+    let mut script_ids: Vec<String> = Vec::new();
     let scripts_path = directory.join("scripts");
     for entry in std::fs::read_dir(scripts_path).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         let script = Script::try_from(path).unwrap();
         script.sync();
+        script_ids.push(script.id.clone());
+    }
+    let scripts = Script::get_all();
+    for script in scripts {
+        if !script_ids.contains(&script.id) {
+            script.delete();
+        }
     }
 
+    let mut job_ids: Vec<String> = Vec::new();
     let jobs_path = directory.join("jobs");
     for entry in std::fs::read_dir(jobs_path).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         let job = Job::try_from(path).unwrap();
         job.sync();
+        job_ids.push(job.id.clone());
     }
+    let jobs = Job::get_all();
+    for job in jobs {
+        if !job_ids.contains(&job.id) && !job.read_only {
+            job.delete();
+        }
+    }
+
+    Ok(())
 }

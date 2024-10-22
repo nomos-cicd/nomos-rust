@@ -1,12 +1,12 @@
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::git::git_clone;
-use crate::utils::{execute_command, execute_script};
+use crate::settings;
+use crate::utils::execute_command;
 
 pub trait ScriptExecutor {
     fn execute(
@@ -27,6 +27,12 @@ pub struct GitCloneScript {
     pub credential_id: Option<String>,
 }
 
+/// Scans directory for credential, script and job files and syncs them with the database.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct SyncScript {
+    pub directory: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum ScriptType {
@@ -34,6 +40,8 @@ pub enum ScriptType {
     Bash(BashScript),
     #[serde(rename = "git-clone")]
     GitClone(GitCloneScript),
+    #[serde(rename = "sync")]
+    Sync(SyncScript),
 }
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
@@ -44,7 +52,7 @@ pub struct ScriptParameter {
     pub default: Option<String>,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct ScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
@@ -53,6 +61,12 @@ pub struct ScriptStep {
     pub is_success: bool,
     pub started_at: DateTime<Utc>,
     pub finished_at: DateTime<Utc>,
+}
+
+impl PartialEq for ScriptStep {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.values == other.values
+    }
 }
 
 #[derive(Debug)]
@@ -75,6 +89,18 @@ impl Script {
         }
     }
 
+    pub fn get_all() -> Vec<Self> {
+        let scripts_path = default_scripts_location();
+        let mut scripts = vec![];
+        for entry in std::fs::read_dir(scripts_path).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            let script = Script::try_from(path).unwrap();
+            scripts.push(script);
+        }
+        scripts
+    }
+
     /// Save as YamlScript. Primarily used after creating a new script.
     pub fn sync(&self) {
         let existing_script = Script::get(self.id.as_str());
@@ -83,18 +109,30 @@ impl Script {
                 || existing_script.parameters != self.parameters
                 || existing_script.steps != self.steps
             {
+                eprintln!("Updated script {:?}", self.id);
                 self.save();
+            } else {
+                eprintln!("Existing script {:?}", self.id);
             }
         } else {
+            eprintln!("New script {:?}", self.id);
             self.save();
         }
     }
 
     fn save(&self) {
-        eprintln!("Saving script: {}", self.id);
         let path = default_scripts_location().join(format!("{}.yml", self.id));
-        let file = File::create(path).expect("Could not create file");
-        serde_yaml::to_writer(file, &YamlScript::from(self)).expect("Could not write to file");
+        let file = File::create(path).map_err(|e| e.to_string()).unwrap();
+        serde_yaml::to_writer(file, &YamlScript::from(self))
+            .map_err(|e| e.to_string())
+            .unwrap();
+    }
+
+    pub fn delete(&self) {
+        let path = default_scripts_location().join(format!("{}.yml", self.id));
+        std::fs::remove_file(&path)
+            .map_err(|e| e.to_string())
+            .unwrap();
     }
 }
 
@@ -278,6 +316,37 @@ impl ScriptExecutor for GitCloneScript {
     }
 }
 
+impl ScriptExecutor for SyncScript {
+    fn execute(
+        &self,
+        parameters: &mut HashMap<String, String>,
+        directory: PathBuf,
+        step_name: &str,
+    ) -> Result<(), String> {
+        let is_variable = self.directory.starts_with("$");
+        let mut param_directory = if is_variable {
+            PathBuf::from(
+                parameters
+                    .get(&self.directory)
+                    .cloned()
+                    .expect("Could not get directory"),
+            )
+        } else {
+            PathBuf::from(&self.directory)
+        };
+
+        if !param_directory.exists() {
+            return Err(format!("Directory does not exist: {:?}", param_directory));
+        }
+
+        if param_directory.is_relative() {
+            param_directory = directory.join(param_directory);
+        }
+
+        settings::sync(param_directory)
+    }
+}
+
 impl ScriptExecutor for ScriptType {
     fn execute(
         &self,
@@ -288,6 +357,7 @@ impl ScriptExecutor for ScriptType {
         match self {
             ScriptType::Bash(bash) => bash.execute(parameters, directory, step_name),
             ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory, step_name),
+            ScriptType::Sync(sync) => sync.execute(parameters, directory, step_name),
         }
     }
 }
@@ -321,11 +391,13 @@ impl ScriptStep {
 
 pub fn default_scripts_location() -> PathBuf {
     let path = if cfg!(target_os = "windows") {
-        let appdata = std::env::var("APPDATA").expect("Could not get APPDATA");
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string()).unwrap();
         PathBuf::from(appdata).join("nomos").join("scripts")
     } else {
         PathBuf::from("/var/lib/nomos/scripts")
     };
-    std::fs::create_dir_all(&path).expect("Could not create scripts directory");
+    std::fs::create_dir_all(&path)
+        .map_err(|e| e.to_string())
+        .unwrap();
     path
 }

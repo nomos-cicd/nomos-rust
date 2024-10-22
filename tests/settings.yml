@@ -1,0 +1,12 @@
+credentials:
+  - id: test1
+    read_only: true
+    value:
+      type: ssh
+      username: root
+      private_key: privkey
+  - id: test2
+    read_only: false
+    value:
+      type: text
+      value: val

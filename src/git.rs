@@ -7,21 +7,25 @@ use crate::{
     utils::{execute_command, execute_command_with_env},
 };
 
-pub fn git_clone(url: &str, directory: PathBuf, credential_id: Option<&str>) -> Result<(), Box<dyn Error>> {
+pub fn git_clone(url: &str, directory: PathBuf, credential_id: Option<&str>) -> Result<(), String> {
     if cfg!(target_os = "windows") {
         // Workaround for local
         execute_command(&format!("git clone {}", url), directory.clone())?;
         Ok(())
     } else if credential_id.is_some() {
-        let credential = Credential::get(credential_id.unwrap()).expect("Could not get credential");
+        let credential =
+            Credential::get(credential_id.unwrap()).ok_or("Could not get credential")?;
         if let CredentialType::Ssh(ssh_credential) = credential.value {
             // Workaround for local
             execute_command(&format!("git clone {}", url), directory.clone())?;
-            let tmp_file = NamedTempFile::new()?;
+            let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
             let tmp_path = tmp_file.path();
-            std::fs::write(tmp_path, &ssh_credential.private_key)?;
+            let _ = std::fs::write(tmp_path, &ssh_credential.private_key);
 
-            execute_command(&format!("chmod 400 {}", tmp_path.display()), directory.clone())?;
+            execute_command(
+                &format!("chmod 400 {}", tmp_path.display()),
+                directory.clone(),
+            )?;
 
             let env = vec![(
                 "GIT_SSH_COMMAND".to_string(),

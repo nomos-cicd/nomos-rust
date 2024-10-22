@@ -88,11 +88,11 @@ impl TryFrom<PathBuf> for Job {
     type Error = String;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = File::open(&path).expect("Could not open file");
+        let file = File::open(&path).map_err(|_| "Could not open file")?;
         let reader = BufReader::new(file);
-        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).expect("Could not read file");
-        let yaml_job: YamlJob = serde_yaml::from_value(yaml).expect("Could not parse YAML");
-        Ok(Job::try_from(yaml_job).expect("Could not convert to job"))
+        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
+        let yaml_job: YamlJob = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
+        Job::try_from(yaml_job)
     }
 }
 
@@ -155,10 +155,10 @@ impl TryFrom<PathBuf> for YamlJob {
     type Error = String;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = File::open(&path).expect("Could not open file");
+        let file = File::open(&path).map_err(|_| "Could not open file")?;
         let reader = BufReader::new(file);
-        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).expect("Could not read file");
-        let yaml_job: YamlJob = serde_yaml::from_value(yaml).expect("Could not parse YAML");
+        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
+        let yaml_job: YamlJob = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
         Ok(yaml_job)
     }
 }
@@ -219,18 +219,27 @@ impl JobResult {
 impl Job {
     /// Reads as YamlJob and converts to Job. Primarily used before executing a job.
     pub fn get(id: &str) -> Option<Self> {
-        let path = PathBuf::from("jobs").join(format!("{}.yaml", id));
-        let yaml_job = YamlJob::try_from(path).ok()?;
-        Some(Job::try_from(yaml_job).ok()?)
+        let path = default_jobs_location().join(format!("{}.yaml", id));
+        let yaml_job = YamlJob::try_from(path);
+        if let Ok(yaml_job) = yaml_job {
+            let job = Job::try_from(yaml_job);
+            if let Ok(job) = job {
+                Some(job)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     pub fn get_all() -> Vec<Self> {
-        let path = PathBuf::from("jobs");
+        let path = default_jobs_location();
         let mut jobs = Vec::new();
-        for entry in std::fs::read_dir(path).expect("Could not read directory") {
-            let entry = entry.expect("Could not read entry");
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
+            let entry = entry.map_err(|e| e.to_string()).unwrap();
             let path = entry.path();
-            let job = Job::try_from(path).expect("Could not convert to job");
+            let job = Job::try_from(path).map_err(|e| e.to_string()).unwrap();
             jobs.push(job);
         }
         jobs
@@ -244,26 +253,34 @@ impl Job {
                 || existing_job.triggers != self.triggers
                 || existing_job.script_id != self.script_id
             {
+                eprintln!("Updating job {:?}", existing_job.id);
                 self.save();
+            } else {
+                eprintln!("Existing job {:?}", existing_job.id);
             }
         } else {
+            eprintln!("New job {:?}", self.id);
             self.save();
         }
     }
 
     fn save(&self) {
-        let path = PathBuf::from("jobs").join(format!("{}.yaml", self.id));
-        let file = File::create(path).expect("Could not create file");
-        serde_yaml::to_writer(file, &YamlJob::from(self)).expect("Could not write to file");
+        let path = default_jobs_location().join(format!("{}.yaml", self.id));
+        let file = File::create(path).map_err(|e| e.to_string()).unwrap();
+        serde_yaml::to_writer(file, &YamlJob::from(self))
+            .map_err(|e| e.to_string())
+            .unwrap();
     }
 
     pub fn delete(&self) {
         let path = PathBuf::from("jobs").join(format!("{}.yaml", self.id));
-        std::fs::remove_file(&path).expect("Could not delete file");
+        std::fs::remove_file(&path)
+            .map_err(|e| e.to_string())
+            .unwrap();
     }
 
-    pub fn execute(&self, parameters: HashMap<String, String>) -> JobResult {
-        let script = Script::get(&self.script_id).expect("Could not get script");
+    pub fn execute(&self, parameters: HashMap<String, String>) -> Result<JobResult, String> {
+        let script = Script::get(&self.script_id).ok_or("Could not get script")?;
         self.execute_with_script(parameters, &script)
     }
 
@@ -271,7 +288,7 @@ impl Job {
         &self,
         parameters: HashMap<String, String>,
         script: &Script,
-    ) -> JobResult {
+    ) -> Result<JobResult, String> {
         let mut merged_parameters = parameters.clone();
         for parameter in &self.parameters {
             if !parameters.contains_key(&parameter.name) {
@@ -299,7 +316,7 @@ impl Job {
 
         let mut job_result = Box::new(JobResult::from((self, script)));
         let directory = default_job_results_location().join(&job_result.id);
-        std::fs::create_dir_all(&directory).expect("Could not create job_results directory");
+        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
 
         job_result.start_step();
         while !job_result.finished_at.is_some() {
@@ -316,17 +333,32 @@ impl Job {
             job_result.finish_step(true);
         }
 
-        *job_result
+        Ok(*job_result)
     }
 }
 
 pub fn default_job_results_location() -> PathBuf {
     let path = if cfg!(target_os = "windows") {
-        let appdata = std::env::var("APPDATA").expect("Could not get APPDATA");
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string()).unwrap();
         PathBuf::from(appdata).join("nomos").join("job_results")
     } else {
         PathBuf::from("/var/lib/nomos/job_results")
     };
-    std::fs::create_dir_all(&path).expect("Could not create job_results directory");
+    std::fs::create_dir_all(&path)
+        .map_err(|e| e.to_string())
+        .unwrap();
+    path
+}
+
+pub fn default_jobs_location() -> PathBuf {
+    let path = if cfg!(target_os = "windows") {
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string()).unwrap();
+        PathBuf::from(appdata).join("nomos").join("jobs")
+    } else {
+        PathBuf::from("/var/lib/nomos/jobs")
+    };
+    std::fs::create_dir_all(&path)
+        .map_err(|e| e.to_string())
+        .unwrap();
     path
 }
