@@ -25,10 +25,17 @@ pub struct PythonScript {
     pub code: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitCloneScript {
+    pub url: String,
+    pub credential_id: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub enum ScriptType {
     Bash(BashScript),
     Python(PythonScript),
+    GitClone(GitCloneScript),
 }
 
 #[derive(Deserialize, Debug)]
@@ -108,6 +115,18 @@ pub struct YamlScriptStep {
     pub name: String,
     pub bash: Option<String>,
     pub python: Option<String>,
+    pub git_clone: Option<GitCloneScript>,
+}
+
+impl Default for YamlScriptStep {
+    fn default() -> Self {
+        YamlScriptStep {
+            name: String::new(),
+            bash: None,
+            python: None,
+            git_clone: None,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -131,6 +150,12 @@ impl From<YamlScript> for Script {
             if let Some(python) = &yaml_step.python {
                 values.push(ScriptType::Python(PythonScript {
                     code: python.to_string(),
+                }));
+            }
+            if let Some(git_clone) = &yaml_step.git_clone {
+                values.push(ScriptType::GitClone(GitCloneScript {
+                    url: git_clone.url.to_string(),
+                    credential_id: git_clone.credential_id.clone(),
                 }));
             }
             steps.push(ScriptStep {
@@ -208,6 +233,31 @@ impl ScriptExecutor for PythonScript {
     }
 }
 
+impl ScriptExecutor for GitCloneScript {
+    fn execute(
+        &self,
+        parameters: HashMap<String, String>,
+        directory: PathBuf,
+    ) -> Result<(), String> {
+        let mut url = self.url.clone();
+        let is_variable = url.starts_with("$parameters.");
+        if is_variable {
+            let key = url.replace("$parameters.", "");
+            url = parameters.get(&key).cloned().unwrap_or_default();
+        }
+
+        let mut credential_id = self.credential_id.clone();
+        let is_variable = credential_id.as_ref().map_or(false, |id| id.starts_with("$parameters."));
+        if is_variable {
+            let key = credential_id.as_ref().unwrap().replace("$parameters.", "");
+            credential_id = parameters.get(&key).cloned();
+        }
+
+        crate::git::git_clone(&url, directory, credential_id.as_deref())
+            .map_err(|e| e.to_string())
+    }
+}
+
 impl ScriptExecutor for ScriptType {
     fn execute(
         &self,
@@ -217,6 +267,7 @@ impl ScriptExecutor for ScriptType {
         match self {
             ScriptType::Bash(bash) => bash.execute(parameters, directory),
             ScriptType::Python(python) => python.execute(parameters, directory),
+            ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory),
         }
     }
 }

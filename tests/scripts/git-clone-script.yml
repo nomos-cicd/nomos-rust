@@ -5,6 +5,12 @@ parameters:
     description: Git clone URL
     required: true
     type: string
+  - name: git_credential_id
+    description: Git credential ID
+    required: false
+    type: string
 steps:
   - name: Clone
-    bash: git clone $parameters.git_clone_url
+    git_clone:
+      url: $parameters.git_clone_url
+      credential_id: $parameters.git_credential_id

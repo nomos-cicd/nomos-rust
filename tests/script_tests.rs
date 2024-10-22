@@ -11,7 +11,7 @@ fn create_script() {
         steps: vec![YamlScriptStep {
             name: "Step 1".to_string(),
             bash: Some("echo 'Hello'".to_string()),
-            python: None,
+            ..Default::default()
         }],
     };
 

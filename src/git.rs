@@ -7,13 +7,13 @@ use crate::{
     utils::{execute_command, execute_command_with_env},
 };
 
-pub fn git_clone(url: &str, directory: PathBuf, ssd_id: Option<&str>) -> Result<(), Box<dyn Error>> {
+pub fn git_clone(url: &str, directory: PathBuf, credential_id: Option<&str>) -> Result<(), Box<dyn Error>> {
     if cfg!(target_os = "windows") {
         // Workaround for local
         execute_command(&format!("git clone {}", url), directory.clone())?;
         Ok(())
-    } else if ssd_id.is_some() {
-        let credential = Credential::get(ssd_id.unwrap()).expect("Could not get credential");
+    } else if credential_id.is_some() {
+        let credential = Credential::get(credential_id.unwrap()).expect("Could not get credential");
         if let CredentialType::Ssh(ssh_credential) = credential.value {
             // Workaround for local
             execute_command(&format!("git clone {}", url), directory.clone())?;
