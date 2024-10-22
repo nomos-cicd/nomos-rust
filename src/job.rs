@@ -241,10 +241,13 @@ impl Job {
             }
         }
         if !missing_parameters.is_empty() {
-            panic!(
-                "Missing parameters: {}",
-                missing_parameters.join(", ")
-            );
+            panic!("Missing parameters: {}", missing_parameters.join(", "));
+        }
+
+        // Add '$parameters.' to each parameter
+        let mut merged_parameters_with_prefix = HashMap::new();
+        for (key, value) in merged_parameters.clone() {
+            merged_parameters_with_prefix.insert(format!("$parameters.{}", key), value);
         }
 
         let mut job_result = Box::new(JobResult::from((self, script)));
@@ -254,7 +257,11 @@ impl Job {
         job_result.start_step();
         while !job_result.finished_at.is_some() {
             let current_step = job_result.current_step.as_ref().unwrap();
-            let result = current_step.execute(merged_parameters.clone(), directory.clone());
+            let result = current_step.execute(
+                &mut merged_parameters_with_prefix,
+                directory.clone(),
+                current_step.name.as_str(),
+            );
             if result.is_err() {
                 job_result.finish_step(false);
                 break;

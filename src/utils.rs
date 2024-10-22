@@ -61,7 +61,7 @@ pub fn execute_script(mut child: Child) -> Result<(), String> {
     std::thread::spawn(move || {
         for line in stdout_reader.lines() {
             if let Ok(line) = line {
-                println!("STDOUT: {}", line);
+                eprintln!("STDOUT: {}", line);
             }
         }
     });

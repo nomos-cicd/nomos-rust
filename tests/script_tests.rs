@@ -10,7 +10,9 @@ fn create_script() {
         parameters: vec![],
         steps: vec![YamlScriptStep {
             name: "Step 1".to_string(),
-            bash: Some("echo 'Hello'".to_string()),
+            value: ScriptType::Bash(nomos_rust::script::BashScript {
+                code: "echo 'Hello'".to_string(),
+            }),
             ..Default::default()
         }],
     };

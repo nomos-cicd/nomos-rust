@@ -3,8 +3,9 @@ mod git;
 mod credential;
 mod script;
 mod job;
+mod settings;
 
 
 fn main() {
-    println!("Hello, world!");
+    eprintln!("Hello, world!");
 }

@@ -11,6 +11,13 @@ parameters:
     type: string
 steps:
   - name: Clone
-    git_clone:
+    value:
+      type: GitClone
       url: $parameters.git_clone_url
       credential_id: $parameters.git_credential_id
+  - name: List files
+    value:
+      type: Bash
+      code: |
+        echo $steps.Clone.GitClone.directory
+        dir

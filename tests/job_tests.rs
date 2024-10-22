@@ -46,7 +46,7 @@ fn execute_job() {
     let path_buf = PathBuf::from("tests/jobs/test-job.yml");
     let yaml_job = YamlJob::try_from(path_buf).unwrap();
     let job = Job::try_from(yaml_job).unwrap();
-    let script = Script::get_from_path("tests/scripts/test-script.yml").unwrap();
+    let script = Script::read_from_yml("tests/scripts/test-script.yml").unwrap();
     let result = job.execute_with_script(Default::default(), &script);
     assert!(result.finished_at.is_some());
     assert!(result.is_success);
@@ -60,9 +60,9 @@ fn git_clone_job() {
     let path_buf = PathBuf::from("tests/jobs/git-clone-job.yml");
     let yaml_job = YamlJob::try_from(path_buf).unwrap();
     let job = Job::try_from(yaml_job).unwrap();
-    let script = Script::get_from_path("tests/scripts/git-clone-script.yml").unwrap();
+    let script = Script::read_from_yml("tests/scripts/git-clone-script.yml").unwrap();
     let result = job.execute_with_script(Default::default(), &script);
     assert!(result.finished_at.is_some());
     assert!(result.is_success);
-    assert_eq!(result.steps.len(), 1);
+    assert_eq!(result.steps.len(), 2);
 }

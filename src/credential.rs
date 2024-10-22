@@ -8,19 +8,20 @@ pub struct TextCredentialParameter {
     pub value: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct SshCredentialParameter {
     pub username: String,
     pub private_key: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum CredentialType {
     Text(TextCredentialParameter),
     Ssh(SshCredentialParameter),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Credential {
     pub id: String,
     pub value: CredentialType,
@@ -47,21 +48,31 @@ impl Credential {
     pub fn get(credential_id: &str) -> Option<Self> {
         let path = default_credentials_location().join(format!("{}.yml", credential_id));
         if path.exists() {
-            let yaml_credential = YamlCredential::try_from(path).ok()?;
-            Some(Credential::try_from(yaml_credential).ok()?)
+            let content = std::fs::read_to_string(&path).expect("Could not read file");
+            serde_yaml::from_str(&content).expect("Could not parse file")
         } else {
             None
         }
     }
 
-    pub fn get_from_path(path_str: &str) -> Option<Self> {
+    /// Reads as YamlCredential and converts to Credential. Primarily used for creating a new credential.
+    pub fn read_from_yml(path_str: &str) -> Option<Self> {
         let path = PathBuf::from(path_str);
         if path.exists() {
-            let yaml_credential = YamlCredential::try_from(path).ok()?;
-            Some(Credential::try_from(yaml_credential).ok()?)
+            let yaml_credential: YamlCredential =
+                serde_yaml::from_str(&std::fs::read_to_string(&path).expect("Could not read file"))
+                    .expect("Could not parse file");
+            Credential::try_from(yaml_credential).ok()
         } else {
             None
         }
+    }
+
+    pub fn save(&self) {
+        let path = default_credentials_location().join(format!("{}.yml", self.id));
+        let file = std::fs::File::create(&path).expect("Could not create file");
+        let writer = std::io::BufWriter::new(file);
+        serde_yaml::to_writer(writer, self).expect("Could not write to file");
     }
 }
 
@@ -94,6 +105,33 @@ impl TryFrom<YamlCredential> for Credential {
 
         Ok(Credential {
             id: value.id,
+            value: c_type,
+            read_only: value.read_only,
+            ..Default::default()
+        })
+    }
+}
+
+impl TryFrom<&YamlCredential> for Credential {
+    type Error = String;
+
+    fn try_from(value: &YamlCredential) -> Result<Self, Self::Error> {
+        let c_type = match value.type_.as_str() {
+            "text" => {
+                let text_value: TextCredentialParameter =
+                    serde_yaml::from_value(value.value.clone()).map_err(|e| e.to_string())?;
+                CredentialType::Text(text_value)
+            }
+            "ssh" => {
+                let ssh_value: SshCredentialParameter =
+                    serde_yaml::from_value(value.value.clone()).map_err(|e| e.to_string())?;
+                CredentialType::Ssh(ssh_value)
+            }
+            _ => return Err("Invalid credential type".to_string()),
+        };
+
+        Ok(Credential {
+            id: value.id.clone(),
             value: c_type,
             read_only: value.read_only,
             ..Default::default()

@@ -3,42 +3,45 @@ use std::process::{Command, Stdio};
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
+use crate::git::git_clone;
 use crate::utils::{execute_command, execute_script};
 
 pub trait ScriptExecutor {
     fn execute(
         &self,
-        parameters: HashMap<String, String>,
+        parameters: &mut HashMap<String, String>,
         directory: PathBuf,
+        step_name: &str,
     ) -> Result<(), String>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BashScript {
     pub code: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PythonScript {
     pub code: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GitCloneScript {
     pub url: String,
     pub credential_id: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
 pub enum ScriptType {
     Bash(BashScript),
     Python(PythonScript),
     GitClone(GitCloneScript),
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct ScriptParameter {
     pub name: String,
     pub description: String,
@@ -57,13 +60,16 @@ pub struct ScriptStep {
     pub finished_at: DateTime<Utc>,
 }
 
+#[derive(Debug)]
 pub struct Script {
     pub id: String,
     pub name: String,
     pub parameters: Vec<ScriptParameter>,
     pub steps: Vec<ScriptStep>,
 }
+
 impl Script {
+    /// Reads as YamlScript and converts to Script. Primarily used before executing a job.
     pub(crate) fn get(script_id: &str) -> Option<Self> {
         let path = default_scripts_location().join(format!("{}.yml", script_id));
         if path.exists() {
@@ -74,7 +80,8 @@ impl Script {
         }
     }
 
-    pub fn get_from_path(path_str: &str) -> Option<Self> {
+    /// Reads as YamlScript and converts to Script. Primarily used for creating a new script.
+    pub fn read_from_yml(path_str: &str) -> Option<Self> {
         let path = PathBuf::from(path_str);
         if path.exists() {
             let yaml_script = YamlScript::try_from(path).ok()?;
@@ -113,18 +120,16 @@ impl Default for ScriptStep {
 #[derive(Deserialize, Debug)]
 pub struct YamlScriptStep {
     pub name: String,
-    pub bash: Option<String>,
-    pub python: Option<String>,
-    pub git_clone: Option<GitCloneScript>,
+    pub value: ScriptType,
 }
 
 impl Default for YamlScriptStep {
     fn default() -> Self {
         YamlScriptStep {
             name: String::new(),
-            bash: None,
-            python: None,
-            git_clone: None,
+            value: ScriptType::Bash(BashScript {
+                code: String::new(),
+            }),
         }
     }
 }
@@ -139,31 +144,15 @@ pub struct YamlScript {
 
 impl From<YamlScript> for Script {
     fn from(yaml_script: YamlScript) -> Self {
-        let mut steps = vec![];
-        for yaml_step in yaml_script.steps.iter() {
-            let mut values = vec![];
-            if let Some(bash) = &yaml_step.bash {
-                values.push(ScriptType::Bash(BashScript {
-                    code: bash.to_string(),
-                }));
-            }
-            if let Some(python) = &yaml_step.python {
-                values.push(ScriptType::Python(PythonScript {
-                    code: python.to_string(),
-                }));
-            }
-            if let Some(git_clone) = &yaml_step.git_clone {
-                values.push(ScriptType::GitClone(GitCloneScript {
-                    url: git_clone.url.to_string(),
-                    credential_id: git_clone.credential_id.clone(),
-                }));
-            }
-            steps.push(ScriptStep {
-                name: yaml_step.name.to_string(),
-                values,
+        let steps = yaml_script
+            .steps
+            .iter()
+            .map(|step| ScriptStep {
+                name: step.name.clone(),
+                values: vec![step.value.clone()],
                 ..Default::default()
-            });
-        }
+            })
+            .collect();
         Script {
             id: yaml_script.id.to_string(),
             name: yaml_script.name.to_string(),
@@ -186,13 +175,13 @@ impl TryFrom<PathBuf> for YamlScript {
 impl ScriptExecutor for BashScript {
     fn execute(
         &self,
-        parameters: HashMap<String, String>,
+        parameters: &mut HashMap<String, String>,
         directory: PathBuf,
+        step_name: &str,
     ) -> Result<(), String> {
         let mut replaced_code = self.code.clone();
-        // example: $parameters.git_clone_url
         for (key, value) in parameters.iter() {
-            replaced_code = replaced_code.replace(&format!("$parameters.{}", key), value);
+            replaced_code = replaced_code.replace(key, value);
         }
 
         let mut cmd_code = String::new();
@@ -218,8 +207,9 @@ impl ScriptExecutor for BashScript {
 impl ScriptExecutor for PythonScript {
     fn execute(
         &self,
-        parameters: HashMap<String, String>,
+        parameters: &mut HashMap<String, String>,
         directory: PathBuf,
+        step_name: &str,
     ) -> Result<(), String> {
         let child = Command::new("python")
             .arg("-c")
@@ -236,38 +226,51 @@ impl ScriptExecutor for PythonScript {
 impl ScriptExecutor for GitCloneScript {
     fn execute(
         &self,
-        parameters: HashMap<String, String>,
+        parameters: &mut HashMap<String, String>,
         directory: PathBuf,
+        step_name: &str,
     ) -> Result<(), String> {
         let mut url = self.url.clone();
         let is_variable = url.starts_with("$parameters.");
         if is_variable {
-            let key = url.replace("$parameters.", "");
-            url = parameters.get(&key).cloned().unwrap_or_default();
+            url = parameters.get(&url).cloned().unwrap_or_default();
         }
 
         let mut credential_id = self.credential_id.clone();
-        let is_variable = credential_id.as_ref().map_or(false, |id| id.starts_with("$parameters."));
+        let is_variable = credential_id
+            .as_ref()
+            .map_or(false, |id| id.starts_with("$parameters."));
         if is_variable {
-            let key = credential_id.as_ref().unwrap().replace("$parameters.", "");
-            credential_id = parameters.get(&key).cloned();
+            credential_id = parameters.get(credential_id.as_ref().unwrap()).cloned();
         }
 
-        crate::git::git_clone(&url, directory, credential_id.as_deref())
-            .map_err(|e| e.to_string())
+        git_clone(&url, directory.clone(), credential_id.as_deref()).map_err(|e| e.to_string())?;
+
+        let mut cloned_dir = directory.clone().join(url.split('/').last().unwrap());
+        if cloned_dir.to_str().unwrap().ends_with(".git") {
+            cloned_dir = cloned_dir.parent().unwrap().to_path_buf();
+        }
+
+        parameters.insert(
+            format!("$steps.{}.GitClone.directory", step_name),
+            cloned_dir.to_str().unwrap().to_string(),
+        );
+
+        Ok(())
     }
 }
 
 impl ScriptExecutor for ScriptType {
     fn execute(
         &self,
-        parameters: HashMap<String, String>,
+        parameters: &mut HashMap<String, String>,
         directory: PathBuf,
+        step_name: &str,
     ) -> Result<(), String> {
         match self {
-            ScriptType::Bash(bash) => bash.execute(parameters, directory),
-            ScriptType::Python(python) => python.execute(parameters, directory),
-            ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory),
+            ScriptType::Bash(bash) => bash.execute(parameters, directory, step_name),
+            ScriptType::Python(python) => python.execute(parameters, directory, step_name),
+            ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory, step_name),
         }
     }
 }
@@ -275,11 +278,12 @@ impl ScriptExecutor for ScriptType {
 impl ScriptExecutor for ScriptStep {
     fn execute(
         &self,
-        parameters: HashMap<String, String>,
+        parameters: &mut HashMap<String, String>,
         directory: PathBuf,
+        step_name: &str,
     ) -> Result<(), String> {
         for value in self.values.iter() {
-            value.execute(parameters.clone(), directory.clone())?;
+            value.execute(parameters, directory.clone(), step_name)?;
         }
         Ok(())
     }

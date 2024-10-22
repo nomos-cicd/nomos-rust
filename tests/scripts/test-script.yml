@@ -8,4 +8,7 @@ parameters:
     type: int
 steps:
   - name: Test Step
-    bash: echo "Hello, World!"
+    value:
+      type: Bash
+      code: |
+        echo "Test script"
