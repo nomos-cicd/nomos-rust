@@ -44,7 +44,7 @@ async fn main() {
         .route("/credentials", routing::get(template_credentials))
         .route("/credentials/create", routing::get(template_create_credential))
         .route("/credentials/:id", routing::get(template_update_credential))
-        .route("/template/credential-value", routing::get(template_credential_type))
+        .route("/template/credential-value", routing::get(template_credential_value))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -229,7 +229,7 @@ struct CredentialValueQuery {
     credential_type: String,
 }
 
-async fn template_credential_type(params: Query<CredentialValueQuery>) -> (StatusCode, Html<String>) {
+async fn template_credential_value(params: Query<CredentialValueQuery>) -> (StatusCode, Html<String>) {
     if let Some(id) = &params.id {
         let credential = Credential::get(id.as_str());
         if let Some(credential) = credential {
