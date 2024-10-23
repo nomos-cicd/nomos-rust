@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use chrono::{DateTime, Utc};
+use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 
 use crate::git::git_clone;
@@ -19,11 +20,11 @@ pub trait ScriptExecutor {
     ) -> Result<(), String>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct BashScript {
     pub code: String,
 }
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct GitCloneScript {
     pub url: String,
     pub credential_id: Option<String>,
@@ -31,12 +32,12 @@ pub struct GitCloneScript {
 }
 
 /// Scans directory for credential, script and job files and syncs them with the database.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct SyncScript {
     pub directory: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type")]
 pub enum ScriptType {
     #[serde(rename = "bash")]
@@ -47,7 +48,7 @@ pub enum ScriptType {
     Sync(SyncScript),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(tag = "type", content = "value")]
 pub enum ScriptParameterType {
     #[serde(rename = "string")]
@@ -181,6 +182,13 @@ impl Default for ScriptStep {
     }
 }
 
+impl ScriptParameterType {
+    pub fn get_json_schema() -> serde_json::Value {
+        let schema = schema_for!(ScriptParameterType);
+        serde_json::to_value(schema).unwrap()
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 pub struct YamlScriptStep {
     pub name: String,
@@ -290,7 +298,7 @@ impl ScriptExecutor for GitCloneScript {
                         log::LogLevel::Warning,
                         format!("Could not get branch, using default: {:?}", branch),
                     );
-                },
+                }
             }
         } else if branch.is_none() {
             branch = "main".to_string().into();

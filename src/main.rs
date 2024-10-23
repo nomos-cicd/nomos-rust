@@ -19,12 +19,18 @@ async fn main() {
         .route("/credentials", routing::get(get_credentials))
         .route("/credentials", routing::post(create_credential))
         .route("/credentials/:id", routing::delete(delete_credential))
+        .route("/credential-types", routing::get(get_credential_types))
         .route("/scripts", routing::get(get_scripts))
         .route("/scripts", routing::post(create_script))
         .route("/scripts/:id", routing::delete(delete_script))
+        .route(
+            "/script-parameter-types",
+            routing::get(get_script_parameter_types),
+        )
         .route("/jobs", routing::get(get_jobs))
         .route("/jobs", routing::post(create_job))
         .route("/jobs/:id", routing::delete(delete_job))
+        .route("/job-trigger-types", routing::get(get_job_trigger_types))
         .route("/job-results", routing::get(get_job_results))
         .route("/job-results/:id", routing::get(get_job_result));
 
@@ -53,6 +59,11 @@ async fn delete_credential(Path(id): Path<String>) -> StatusCode {
     StatusCode::NO_CONTENT
 }
 
+async fn get_credential_types() -> Json<serde_json::Value> {
+    let credential_types = credential::CredentialType::get_json_schema();
+    Json(credential_types)
+}
+
 async fn get_scripts() -> Json<Vec<script::Script>> {
     let scripts = script::Script::get_all();
     Json(scripts)
@@ -72,6 +83,11 @@ async fn delete_script(Path(id): Path<String>) -> StatusCode {
     StatusCode::NO_CONTENT
 }
 
+async fn get_script_parameter_types() -> Json<serde_json::Value> {
+    let script_parameter_types = script::ScriptParameterType::get_json_schema();
+    Json(script_parameter_types)
+}
+
 async fn get_jobs() -> Json<Vec<job::Job>> {
     let jobs = job::Job::get_all();
     Json(jobs)
@@ -89,6 +105,11 @@ async fn delete_job(Path(id): Path<String>) -> StatusCode {
     }
     job.unwrap().delete();
     StatusCode::NO_CONTENT
+}
+
+async fn get_job_trigger_types() -> Json<serde_json::Value> {
+    let job_trigger_types = job::TriggerType::get_json_schema();
+    Json(job_trigger_types)
 }
 
 async fn get_job_results() -> Json<Vec<job::JobResult>> {

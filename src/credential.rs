@@ -1,28 +1,36 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{job::JobResult, log};
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct TextCredentialParameter {
     pub value: String,
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct SshCredentialParameter {
     pub username: String,
     pub private_key: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(tag = "type")]
 pub enum CredentialType {
     #[serde(rename = "text")]
     Text(TextCredentialParameter),
     #[serde(rename = "ssh")]
     Ssh(SshCredentialParameter),
+}
+
+impl CredentialType {
+    pub fn get_json_schema() -> serde_json::Value {
+        let schema = schemars::schema_for!(CredentialType);
+        serde_json::to_value(schema).unwrap()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -88,20 +96,26 @@ impl Credential {
         if let Some(existing_credential) = existing_credential {
             if existing_credential != *self {
                 self.save();
-                if let Some(job_result) = job_result { job_result.add_log(
+                if let Some(job_result) = job_result {
+                    job_result.add_log(
                         log::LogLevel::Info,
                         format!("Updated credential {:?}", self.id),
-                    ) }
-            } else if let Some(job_result) = job_result { job_result.add_log(
-                log::LogLevel::Info,
-                format!("No changes in credential {:?}", self.id),
-            ) }
+                    )
+                }
+            } else if let Some(job_result) = job_result {
+                job_result.add_log(
+                    log::LogLevel::Info,
+                    format!("No changes in credential {:?}", self.id),
+                )
+            }
         } else {
             self.save();
-            if let Some(job_result) = job_result { job_result.add_log(
+            if let Some(job_result) = job_result {
+                job_result.add_log(
                     log::LogLevel::Info,
                     format!("Created credential {:?}", self.id),
-                ) }
+                )
+            }
         }
     }
 
