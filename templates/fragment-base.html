@@ -56,11 +56,13 @@
             <div uk-navbar>
                 <div class="uk-navbar-left">
                     <ul class="uk-navbar-nav">
-                        <li {% if title == "Jobs" %} class="uk-active" {% endif %}><a href="#">Jobs</a></li>
-                        <li {% if title == "Job Results" %} class="uk-active" {% endif %}><a href="#">Job Results</a></li>
-                        <li {% if title == "Create Job" %} class="uk-active" {% endif %}><a href="#">Create Job</a></li>
-                        <li {% if title == "Credentials" %} class="uk-active" {% endif %}><a href="/credentials">Credentials</a></li>
-                        <li {% if title == "Create Credential" %} class="uk-active" {% endif %}><a href="/credentials/create">Create Credential</a></li>
+                        <li {% if title=="Jobs" %} class="uk-active" {% endif %}><a href="#">Jobs</a></li>
+                        <li {% if title=="Job Results" %} class="uk-active" {% endif %}><a href="#">Job Results</a></li>
+                        <li {% if title=="Create Job" %} class="uk-active" {% endif %}><a href="#">Create Job</a></li>
+                        <li {% if title=="Credentials" %} class="uk-active" {% endif %}><a
+                                href="/credentials">Credentials</a></li>
+                        <li {% if title=="Create Credential" %} class="uk-active" {% endif %}><a
+                                href="/credentials/create">Create Credential</a></li>
                     </ul>
                 </div>
             </div>
@@ -69,6 +71,70 @@
     {% block body %}
 
     {% endblock %}
+
+    <script>
+        // Returns JSON elements from form data. Checks if dot notation is used in the name attribute.
+        // E.g. { "name": "John Doe", "address": { "street": "123 Main St", "city": "Springfield" } }
+        function getFormData(form) {
+            const json = {};
+
+            for (const [key, value] of Object.entries(getFormEntries(form))) {
+                const keys = key.split(".");
+                let ref = json;
+
+                for (let i = 0; i < keys.length; i++) {
+                    if (i === keys.length - 1) {
+                        ref[keys[i]] = value;
+                    } else {
+                        ref = ref[keys[i]] = ref[keys[i]] || {};
+                    }
+                }
+            }
+
+            console.log(json);
+            return json;
+        }
+
+        // Uses FormData.entries() + input[type=checkbox]. Return key value pair.
+        function getFormEntries(form) {
+            const data = new FormData(form);
+            const entries = {};
+
+            for (const [key, value] of data.entries()) {
+                entries[key] = value;
+            }
+
+            // Get checkbox values
+            form.querySelectorAll("input[type=checkbox]").forEach((checkbox) => {
+                entries[checkbox.name] = checkbox.checked;
+            });
+
+            return entries;
+        }
+
+        // Submits form data as JSON to the server.
+        function submitForm(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const data = getFormData(form);
+
+            fetch(form.action, {
+                method: form.method,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(data),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    console.log(data);
+                })
+                .catch((error) => {
+                    console.error("Error:", error);
+                });
+        }
+    </script>
 </body>
 
 </html>
