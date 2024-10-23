@@ -76,20 +76,44 @@
     {% endblock %}
 
     <script>
-        // Returns JSON elements from form data. Checks if dot notation is used in the name attribute.
-        // E.g. { "name": "John Doe", "address": { "street": "123 Main St", "city": "Springfield" } }
+        // Returns JSON elements from form data.
+        // Handles both dot notation and array notation in name attributes.
         function getFormData(form) {
             const json = {};
+            const entries = getFormEntries(form);
 
-            for (const [key, value] of Object.entries(getFormEntries(form))) {
-                const keys = key.split(".");
+            // Sort entries to ensure arrays are processed in order
+            entries.sort((a, b) => a[0].localeCompare(b[0]));
+
+            for (const [key, value] of entries) {
+                // Replace "]" with empty string and split by "[" or "."
+                const keys = key.replace(/$$/g, '').split(/[$$\.]/);
                 let ref = json;
 
                 for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+
                     if (i === keys.length - 1) {
-                        ref[keys[i]] = value;
+                        // Last key - set the value
+                        ref[key] = value;
                     } else {
-                        ref = ref[keys[i]] = ref[keys[i]] || {};
+                        // If next key is empty string, we're dealing with an array
+                        const nextKey = keys[i + 1];
+                        if (nextKey === '') {
+                            // Initialize as array if not exists
+                            ref[key] = ref[key] || [];
+                            // Move reference to the last array element or create new one
+                            ref = ref[key];
+                            if (ref.length === 0 || Object.keys(ref[ref.length - 1]).length !== 0) {
+                                ref.push({});
+                            }
+                            ref = ref[ref.length - 1];
+                            // Skip the empty string key
+                            i++;
+                        } else {
+                            // Normal object property
+                            ref = ref[key] = ref[key] || {};
+                        }
                     }
                 }
             }
@@ -98,18 +122,18 @@
             return json;
         }
 
-        // Uses FormData.entries() + input[type=checkbox]. Return key value pair.
+        // Uses FormData.entries() + input[type=checkbox]. Return [key, value][].
         function getFormEntries(form) {
             const data = new FormData(form);
-            const entries = {};
+            const entries = [];
 
-            for (const [key, value] of data.entries()) {
-                entries[key] = value;
-            }
-
-            // Get checkbox values
-            form.querySelectorAll("input[type=checkbox]").forEach((checkbox) => {
-                entries[checkbox.name] = checkbox.checked;
+            // Get all values
+            form.querySelectorAll("input, select, textarea").forEach((input) => {
+                if (input.type === "checkbox") {
+                    entries.push([input.name, input.checked]);
+                } else {
+                    entries.push([input.name, input.value]);
+                }
             });
 
             return entries;

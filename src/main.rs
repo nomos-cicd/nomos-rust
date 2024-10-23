@@ -277,6 +277,7 @@ struct ScriptTemplate<'a> {
 #[template(path = "script-value.html")]
 struct ScriptValueTemplate<'a> {
     script_type: &'a ScriptType,
+    name_prefix: &'a str,
 }
 
 async fn template_scripts() -> Html<String> {
@@ -321,6 +322,7 @@ async fn template_script_value(params: Query<ScriptValueQuery>) -> (StatusCode, 
     if let Ok(script_type) = script_type {
         let template = ScriptValueTemplate {
             script_type: &script_type,
+            name_prefix: "steps[].values[]",
         };
         (StatusCode::OK, Html(template.render().unwrap()))
     } else {

@@ -1,27 +1,40 @@
 {% match script_type %}
 
 {% when crate::script::ScriptType::Bash(val) %}
-<div class="uk-margin">
-    <textarea class="uk-textarea" name="value.code" placeholder="Bash Code" rows="5">{{ val.code }}</textarea>
+<div class="space-y-2">
+    <label class="block text-sm font-medium text-gray-700">Bash Script</label>
+    <textarea class="uk-textarea w-full p-2 border rounded" name="{{name_prefix}}.code"
+        placeholder="Enter your bash script here..." rows="5">{{ val.code }}</textarea>
 </div>
 
 {% when crate::script::ScriptType::GitClone(val) %}
-<div class="uk-margin">
-    <input class="uk-input" type="text" name="value.url" placeholder="Repository URL" value="{{ val.url }}" />
-</div>
-<div class="uk-margin">
-    <input class="uk-input" type="text" name="value.credential_id" placeholder="Credential ID (Optional)" {% if
-        val.credential_id.is_some() %} value="{{ val.clone().credential_id.unwrap() }}" {% endif %} />
-</div>
-<div class="uk-margin">
-    <input class="uk-input" type="text" name="value.branch" placeholder="Branch (Optional)" {% if val.branch.is_some()
-        %} value="{{ val.clone().branch.unwrap() }}" {% endif %} />
+<div class="space-y-4">
+    <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Repository URL</label>
+        <input class="uk-input w-full p-2 border rounded" type="text" name="{{name_prefix}}.url"
+            placeholder="https://github.com/username/repo" value="{{ val.url }}" />
+    </div>
+
+    <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Credential ID</label>
+        <input class="uk-input w-full p-2 border rounded" type="text" name="{{name_prefix}}.credential_id"
+            placeholder="Optional: Enter credential ID" {% if val.credential_id.is_some() %}
+            value="{{ val.clone().credential_id.unwrap() }}" {% endif %} />
+    </div>
+
+    <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Branch</label>
+        <input class="uk-input w-full p-2 border rounded" type="text" name="{{name_prefix}}.branch"
+            placeholder="Optional: Enter branch name" {% if val.branch.is_some() %}
+            value="{{ val.clone().branch.unwrap() }}" {% endif %} />
+    </div>
 </div>
 
 {% when crate::script::ScriptType::Sync(val) %}
-<div class="uk-margin">
-    <input class="uk-input" type="text" name="value.directory" placeholder="Directory Path"
-        value="{{ val.directory }}" />
+<div class="space-y-2">
+    <label class="block text-sm font-medium text-gray-700">Directory Path</label>
+    <input class="uk-input w-full p-2 border rounded" type="text" name="{{name_prefix}}.directory"
+        placeholder="/path/to/directory" value="{{ val.directory }}" />
 </div>
 
 {% endmatch %}

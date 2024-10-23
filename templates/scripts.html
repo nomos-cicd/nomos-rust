@@ -1,30 +1,35 @@
 {% extends "fragment-base.html" %}
 
 {% block body %}
-<table class="uk-table uk-table-middle uk-table-divider">
-    <thead>
-        <tr>
-            <th class="uk-width-small">ID</th>
-            <th>Name</th>
-            <th>Parameters</th>
-            <th>Steps</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for script in scripts %}
-        <tr>
-            <td>{{ script.id }}</td>
-            <td>{{ script.name }}</td>
-            <td>{{ script.parameters.len() }}</td>
-            <td>{{ script.steps.len() }}</td>
-            <td>
-                <button class="uk-button uk-button-default" type="button">
-                    <a href="/scripts/{{ script.id }}">View</a>
-                </button>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="max-w-6xl mx-auto p-6">
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="uk-table uk-table-middle uk-table-divider">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="uk-width-small px-6 py-3 text-left text-sm font-semibold text-gray-900">ID</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Parameters</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Steps</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for script in scripts %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ script.id }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ script.name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ script.parameters.len() }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ script.steps.len() }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <a href="/scripts/{{ script.id }}"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}

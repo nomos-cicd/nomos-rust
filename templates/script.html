@@ -6,23 +6,26 @@
     <fieldset class="uk-fieldset">
         <legend class="uk-legend">Script</legend>
 
-        <div class="uk-margin">
-            <input class="uk-input" type="text" name="id" placeholder="ID" {% if script.is_some() %}
-                value="{{ script.unwrap().id }}" {% endif %} />
-        </div>
+        <!-- Basic Info Section -->
+        <div class="p-4 border rounded-lg mb-4">
+            <div class="uk-margin">
+                <input class="uk-input" type="text" name="id" placeholder="ID" {% if script.is_some() %}
+                    value="{{ script.unwrap().id }}" {% endif %} />
+            </div>
 
-        <div class="uk-margin">
-            <input class="uk-input" type="text" name="name" placeholder="Name" {% if script.is_some() %}
-                value="{{ script.unwrap().name }}" {% endif %} />
+            <div class="uk-margin">
+                <input class="uk-input" type="text" name="name" placeholder="Name" {% if script.is_some() %}
+                    value="{{ script.unwrap().name }}" {% endif %} />
+            </div>
         </div>
 
         <!-- Parameters Section -->
-        <div class="uk-margin">
-            <h4>Parameters</h4>
-            <div id="parameters">
+        <div class="p-4 border rounded-lg mb-4">
+            <h4 class="text-lg font-semibold mb-4">Parameters</h4>
+            <div id="parameters" class="space-y-4">
                 {% if script.is_some() %}
                 {% for param in script.unwrap().parameters %}
-                <div class="uk-margin">
+                <div class="p-3 border rounded bg-gray-50">
                     <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].name"
                         placeholder="Parameter Name" value="{{ param.name }}" />
                     <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].description"
@@ -33,41 +36,55 @@
                 {% endfor %}
                 {% endif %}
             </div>
-            <button type="button" class="uk-button uk-button-default" onclick="addParameter()">Add Parameter</button>
+            <button type="button" class="uk-button uk-button-default mt-4" onclick="addParameter()">Add
+                Parameter</button>
         </div>
 
         <!-- Steps Section -->
-        <div class="uk-margin">
-            <h4>Steps</h4>
-            <div id="steps">
+        <div class="p-4 border rounded-lg mb-4">
+            <h4 class="text-lg font-semibold mb-4">Steps</h4>
+            <div id="steps" class="space-y-6">
                 {% if script.is_some() %}
                 {% for step in script.unwrap().steps %}
-                <div class="uk-margin">
-                    <input class="uk-input uk-margin-small-bottom" type="text" name="steps[].name"
-                        placeholder="Step Name" value="{{ step.name }}" />
-                    {% for value in step.values %}
-                    <div>
-                        <select class="uk-select" name="steps[].values[].type" onchange="updateStepValue(this)">
-                            <option value="bash" {% match value %} {% when crate::script::ScriptType::Bash(_)
-                                %}selected{% else %}{% endmatch %}>Bash</option>
-                            <option value="git-clone" {% match value %} {% when crate::script::ScriptType::GitClone(_)
-                                %}selected{% else %}{% endmatch %}>Git Clone</option>
-                            <option value="sync" {% match value %} {% when crate::script::ScriptType::Sync(_)
-                                %}selected{% else %}{% endmatch %}>Sync</option>
-                        </select>
-                        <div class="step-value">
-                            {% let script_type = value %}
-                            {% include "script-value.html" %}
-                        </div>
+                <div class="p-4 border rounded bg-gray-50">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Step Name</label>
+                        <input class="uk-input" type="text" name="steps[].name" placeholder="Step Name"
+                            value="{{ step.name }}" />
                     </div>
-                    {% endfor %}
-                    <button type="button" class="uk-button uk-button-default" onclick="addStepValue(this)">Add
-                        Value</button>
+                    <div class="space-y-4">
+                        {% for value in step.values %}
+                        <div class="p-4 border rounded bg-white shadow-sm">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Step Type</label>
+                            <select class="uk-select mb-3" name="steps[].values[].type"
+                                onchange="updateStepValue(this)">
+                                <option value="bash" {% match value %} {% when crate::script::ScriptType::Bash(_)
+                                    %}selected{% else %}{% endmatch %}>Bash</option>
+                                <option value="git-clone" {% match value %} {% when
+                                    crate::script::ScriptType::GitClone(_) %}selected{% else %}{% endmatch %}>Git Clone
+                                </option>
+                                <option value="sync" {% match value %} {% when crate::script::ScriptType::Sync(_)
+                                    %}selected{% else %}{% endmatch %}>Sync</option>
+                            </select>
+                            <div class="step-value mt-3">
+                                {% let script_type = value %}
+                                {% let name_prefix = "steps[].values[]" %}
+                                {% include "script-value.html" %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-4">
+                        <button type="button" class="uk-button uk-button-default" onclick="addStepValue(this)">Add
+                            Value</button>
+                    </div>
                 </div>
                 {% endfor %}
                 {% endif %}
             </div>
-            <button type="button" class="uk-button uk-button-default" onclick="addStep()">Add Step</button>
+            <div class="mt-6">
+                <button type="button" class="uk-button uk-button-default" onclick="addStep()">Add Step</button>
+            </div>
         </div>
 
 
@@ -80,7 +97,7 @@
 <script>
     function addParameter() {
         const paramDiv = document.createElement('div');
-        paramDiv.className = 'uk-margin';
+        paramDiv.className = 'p-3 border rounded bg-gray-50';
         paramDiv.innerHTML = `
         <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].name" placeholder="Parameter Name" />
         <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].description" placeholder="Description" />
@@ -91,18 +108,26 @@
 
     function addStep() {
         const stepDiv = document.createElement('div');
-        stepDiv.className = 'uk-margin';
+        stepDiv.className = 'p-4 border rounded bg-gray-50';
         stepDiv.innerHTML = `
-        <input class="uk-input uk-margin-small-bottom" type="text" name="steps[].name" placeholder="Step Name" />
-        <div class="step-value-container">
-            <select class="uk-select" name="steps[].values[].type" onchange="updateStepValue(this)">
-                <option value="bash">Bash</option>
-                <option value="git-clone">Git Clone</option>
-                <option value="sync">Sync</option>
-            </select>
-            <div class="step-value"></div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Step Name</label>
+            <input class="uk-input" type="text" name="steps[].name" placeholder="Step Name" />
         </div>
-        <button type="button" class="uk-button uk-button-default" onclick="addStepValue(this)">Add Value</button>
+        <div class="space-y-4">
+            <div class="p-4 border rounded bg-white shadow-sm">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Step Type</label>
+                <select class="uk-select mb-3" name="steps[].values[].type" onchange="updateStepValue(this)">
+                    <option value="bash">Bash</option>
+                    <option value="git-clone">Git Clone</option>
+                    <option value="sync">Sync</option>
+                </select>
+                <div class="step-value mt-3"></div>
+            </div>
+        </div>
+        <div class="mt-4">
+            <button type="button" class="uk-button uk-button-default" onclick="addStepValue(this)">Add Value</button>
+        </div>
     `;
         document.getElementById('steps').appendChild(stepDiv);
         updateStepValue(stepDiv.querySelector('select'));
@@ -110,16 +135,18 @@
 
     function addStepValue(button) {
         const valueContainer = document.createElement('div');
-        valueContainer.className = 'step-value-container';
+        valueContainer.className = 'p-4 border rounded bg-white shadow-sm';
         valueContainer.innerHTML = `
-        <select class="uk-select" name="steps[].values[].type" onchange="updateStepValue(this)">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Step Type</label>
+        <select class="uk-select mb-3" name="steps[].values[].type" onchange="updateStepValue(this)">
             <option value="bash">Bash</option>
             <option value="git-clone">Git Clone</option>
             <option value="sync">Sync</option>
         </select>
-        <div class="step-value"></div>
+        <div class="step-value mt-3"></div>
     `;
-        button.parentElement.insertBefore(valueContainer, button);
+        const valuesContainer = button.parentElement.previousElementSibling;
+        valuesContainer.appendChild(valueContainer);
         updateStepValue(valueContainer.querySelector('select'));
     }
 
