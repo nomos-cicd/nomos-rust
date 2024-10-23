@@ -6,8 +6,9 @@ mod script;
 mod settings;
 mod utils;
 
-use axum::{extract::Path, http::StatusCode, routing, Json, Router};
-use credential::YamlCredential;
+use askama::Template;
+use axum::{extract::Path, http::StatusCode, response::Html, routing, Json, Router};
+use credential::{Credential, YamlCredential};
 use tower_http::cors::CorsLayer;
 
 #[tokio::main]
@@ -37,6 +38,7 @@ async fn main() {
         .route("/job-trigger-types", routing::get(get_job_trigger_types))
         .route("/job-results", routing::get(get_job_results))
         .route("/job-results/:id", routing::get(get_job_result))
+        .route("/askama-test", routing::get(askama_test))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -152,4 +154,20 @@ async fn get_job_results() -> Json<Vec<job::JobResult>> {
 async fn get_job_result(Path(id): Path<String>) -> Json<job::JobResult> {
     let job_result = job::JobResult::get(id.as_str());
     Json(job_result.unwrap())
+}
+
+#[derive(Template)]
+#[template(path = "credentials.html")]
+struct CredentialsTemplate<'a> {
+    title: &'a str,
+    credentials: Vec<Credential>,
+}
+
+async fn askama_test() -> Html<String> {
+    let credentials = Credential::get_all();
+    let hello = CredentialsTemplate {
+        title: "Credentials",
+        credentials,
+    };
+    Html(hello.render().unwrap())
 }
