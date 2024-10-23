@@ -7,8 +7,14 @@ mod settings;
 mod utils;
 
 use askama::Template;
-use axum::{extract::Path, http::StatusCode, response::Html, routing, Json, Router};
-use credential::{Credential, YamlCredential};
+use axum::{
+    extract::{Path, Query},
+    http::StatusCode,
+    response::Html,
+    routing, Json, Router,
+};
+use credential::{Credential, CredentialType, YamlCredential};
+use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 
 #[tokio::main]
@@ -27,23 +33,18 @@ async fn main() {
         .route("/api/scripts/:id", routing::get(get_script))
         .route("/api/scripts", routing::post(create_script))
         .route("/api/scripts/:id", routing::delete(delete_script))
-        .route(
-            "/script-parameter-types",
-            routing::get(get_script_parameter_types),
-        )
+        .route("/script-parameter-types", routing::get(get_script_parameter_types))
         .route("/api/jobs", routing::get(get_jobs))
         .route("/api/jobs/:id", routing::get(get_job))
         .route("/api/jobs", routing::post(create_job))
         .route("/api/jobs/:id", routing::delete(delete_job))
-        .route(
-            "/api/job-trigger-types",
-            routing::get(get_job_trigger_types),
-        )
+        .route("/api/job-trigger-types", routing::get(get_job_trigger_types))
         .route("/api/job-results", routing::get(get_job_results))
         .route("/api/job-results/:id", routing::get(get_job_result))
-
         .route("/credentials", routing::get(template_credentials))
-        .route("/credentials/:id", routing::get(template_credential))
+        .route("/credentials/create", routing::get(template_create_credential))
+        .route("/credentials/:id", routing::get(template_update_credential))
+        .route("/template/credential-value", routing::get(template_credential_type))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -182,13 +183,73 @@ async fn template_credentials() -> Html<String> {
 struct CredentialTemplate<'a> {
     title: &'a str,
     credential: Option<&'a Credential>,
+    credential_value: &'a CredentialType,
 }
 
-async fn template_credential(Path(id): Path<String>) -> Html<String> {
-    let credential = Credential::get(id.as_str());
+async fn template_update_credential(Path(id): Path<String>) -> Html<String> {
+    template_credential(Some(axum::extract::Path(id)), "Credentials").await
+}
+
+async fn template_create_credential() -> Html<String> {
+    template_credential(None, "Create Credentials").await
+}
+
+async fn template_credential(id: Option<Path<String>>, title: &str) -> Html<String> {
+    let credential = if let Some(id) = id {
+        Credential::get(id.as_str())
+    } else {
+        None
+    };
+    let default_value = CredentialType::from_str("ssh").unwrap();
+
+    let credential_value = if let Some(cred) = credential.as_ref() {
+        &cred.value
+    } else {
+        &default_value
+    };
+
     let template = CredentialTemplate {
-        title: "Credential",
+        title,
         credential: credential.as_ref(),
+        credential_value,
     };
     Html(template.render().unwrap())
+}
+
+#[derive(Template)]
+#[template(path = "credential-value.html")]
+struct CredentialValueTemplate<'a> {
+    credential_value: &'a CredentialType,
+}
+
+#[derive(Deserialize)]
+struct CredentialValueQuery {
+    id: Option<String>,
+    #[serde(rename = "type")]
+    credential_type: String,
+}
+
+async fn template_credential_type(params: Query<CredentialValueQuery>) -> (StatusCode, Html<String>) {
+    if let Some(id) = &params.id {
+        let credential = Credential::get(id.as_str());
+        if let Some(credential) = credential {
+            if credential.get_credential_type() == params.credential_type {
+                let template = CredentialValueTemplate {
+                    credential_value: &credential.value,
+                };
+                return (StatusCode::OK, Html(template.render().unwrap()));
+            }
+        }
+    }
+
+    let credential_type = CredentialType::from_str(params.credential_type.as_str());
+    if credential_type.is_ok() {
+        let credential_type = credential_type.unwrap();
+        let template = CredentialValueTemplate {
+            credential_value: &credential_type,
+        };
+        return (StatusCode::OK, Html(template.render().unwrap()));
+    }
+
+    (StatusCode::BAD_REQUEST, Html("Invalid credential type".to_string()))
 }

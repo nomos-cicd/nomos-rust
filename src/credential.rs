@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{job::JobResult, log};
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Default, Debug)]
 pub struct TextCredentialParameter {
     pub value: String,
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Default, Debug)]
 pub struct SshCredentialParameter {
     pub username: String,
     pub private_key: String,
@@ -30,6 +30,14 @@ impl CredentialType {
     pub fn get_json_schema() -> serde_json::Value {
         let schema = schemars::schema_for!(CredentialType);
         serde_json::to_value(schema).unwrap()
+    }
+
+    pub fn from_str(t: &str) -> Result<Self, String> {
+        match t {
+            "text" => Ok(CredentialType::Text(TextCredentialParameter::default())),
+            "ssh" => Ok(CredentialType::Ssh(SshCredentialParameter::default())),
+            _ => Err(format!("Unknown credential type: {}", t)),
+        }
     }
 }
 
@@ -89,6 +97,13 @@ impl Credential {
             credentials.push(credential);
         }
         credentials
+    }
+
+    pub fn get_credential_type(&self) -> &str {
+        match self.value {
+            CredentialType::Text(_) => "text",
+            CredentialType::Ssh(_) => "ssh",
+        }
     }
 
     pub fn sync(&self, job_result: Option<&mut JobResult>) {

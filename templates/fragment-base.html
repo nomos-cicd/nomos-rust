@@ -47,6 +47,7 @@
 
     <script type="module" src="https://unpkg.com/franken-ui/dist/js/core.iife.js"></script>
     <script type="module" src="https://unpkg.com/franken-ui/dist/js/icon.iife.js"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
 </head>
 
 <body class="bg-background text-foreground">
@@ -59,7 +60,7 @@
                         <li {% if title == "Job Results" %} class="uk-active" {% endif %}><a href="#">Job Results</a></li>
                         <li {% if title == "Create Job" %} class="uk-active" {% endif %}><a href="#">Create Job</a></li>
                         <li {% if title == "Credentials" %} class="uk-active" {% endif %}><a href="/credentials">Credentials</a></li>
-                        <li {% if title == "Create Credential" %} class="uk-active" {% endif %}><a href="#">Create Credential</a></li>
+                        <li {% if title == "Create Credential" %} class="uk-active" {% endif %}><a href="/credentials/create">Create Credential</a></li>
                     </ul>
                 </div>
             </div>
