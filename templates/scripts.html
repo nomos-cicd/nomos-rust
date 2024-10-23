@@ -16,8 +16,8 @@
         <tr>
             <td>{{ script.id }}</td>
             <td>{{ script.name }}</td>
-            <td>{{ "99" }}</td>
-            <td>{{ "99" }}</td>
+            <td>{{ script.parameters.len() }}</td>
+            <td>{{ script.steps.len() }}</td>
             <td>
                 <button class="uk-button uk-button-default" type="button">
                     <a href="/scripts/{{ script.id }}">View</a>

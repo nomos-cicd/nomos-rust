@@ -271,7 +271,6 @@ struct ScriptsTemplate<'a> {
 struct ScriptTemplate<'a> {
     title: &'a str,
     script: Option<&'a Script>,
-    script_type: &'a ScriptType,
 }
 
 #[derive(Template)]
@@ -307,7 +306,6 @@ async fn template_script(id: Option<Path<String>>, title: &str) -> Html<String> 
     let template = ScriptTemplate {
         title,
         script: script.as_ref(),
-        script_type: &ScriptType::from_str("bash").unwrap(),
     };
     Html(template.render().unwrap())
 }

@@ -45,20 +45,31 @@
                 <div class="uk-margin">
                     <input class="uk-input uk-margin-small-bottom" type="text" name="steps[].name"
                         placeholder="Step Name" value="{{ step.name }}" />
-                    <select class="uk-select" name="steps[].type" onchange="updateStepValue(this)">
-                        <option value="bash">Bash</option>
-                        <option value="git-clone">Git Clone</option>
-                        <option value="sync">Sync</option>
-                    </select>
-                    <div class="step-value">
-                        {% include "script-value.html" %}
+                    {% for value in step.values %}
+                    <div>
+                        <select class="uk-select" name="steps[].values[].type" onchange="updateStepValue(this)">
+                            <option value="bash" {% match value %} {% when crate::script::ScriptType::Bash(_)
+                                %}selected{% else %}{% endmatch %}>Bash</option>
+                            <option value="git-clone" {% match value %} {% when crate::script::ScriptType::GitClone(_)
+                                %}selected{% else %}{% endmatch %}>Git Clone</option>
+                            <option value="sync" {% match value %} {% when crate::script::ScriptType::Sync(_)
+                                %}selected{% else %}{% endmatch %}>Sync</option>
+                        </select>
+                        <div class="step-value">
+                            {% let script_type = value %}
+                            {% include "script-value.html" %}
+                        </div>
                     </div>
+                    {% endfor %}
+                    <button type="button" class="uk-button uk-button-default" onclick="addStepValue(this)">Add
+                        Value</button>
                 </div>
                 {% endfor %}
                 {% endif %}
             </div>
             <button type="button" class="uk-button uk-button-default" onclick="addStep()">Add Step</button>
         </div>
+
 
         <div class="uk-margin">
             <button class="uk-button uk-button-primary">Submit</button>
@@ -83,16 +94,35 @@
         stepDiv.className = 'uk-margin';
         stepDiv.innerHTML = `
         <input class="uk-input uk-margin-small-bottom" type="text" name="steps[].name" placeholder="Step Name" />
-        <select class="uk-select" name="steps[].type" onchange="updateStepValue(this)">
+        <div class="step-value-container">
+            <select class="uk-select" name="steps[].values[].type" onchange="updateStepValue(this)">
+                <option value="bash">Bash</option>
+                <option value="git-clone">Git Clone</option>
+                <option value="sync">Sync</option>
+            </select>
+            <div class="step-value"></div>
+        </div>
+        <button type="button" class="uk-button uk-button-default" onclick="addStepValue(this)">Add Value</button>
+    `;
+        document.getElementById('steps').appendChild(stepDiv);
+        updateStepValue(stepDiv.querySelector('select'));
+    }
+
+    function addStepValue(button) {
+        const valueContainer = document.createElement('div');
+        valueContainer.className = 'step-value-container';
+        valueContainer.innerHTML = `
+        <select class="uk-select" name="steps[].values[].type" onchange="updateStepValue(this)">
             <option value="bash">Bash</option>
             <option value="git-clone">Git Clone</option>
             <option value="sync">Sync</option>
         </select>
         <div class="step-value"></div>
     `;
-        document.getElementById('steps').appendChild(stepDiv);
-        updateStepValue(stepDiv.querySelector('select'));
+        button.parentElement.insertBefore(valueContainer, button);
+        updateStepValue(valueContainer.querySelector('select'));
     }
+
 
     function updateStepValue(select) {
         const valueDiv = select.parentElement.querySelector('.step-value');
