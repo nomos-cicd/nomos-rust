@@ -1,0 +1,103 @@
+{% extends "fragment-base.html" %}
+
+{% block body %}
+
+<form method="post" action="/api/scripts" onsubmit="submitForm(event)">
+    <fieldset class="uk-fieldset">
+        <legend class="uk-legend">Script</legend>
+
+        <div class="uk-margin">
+            <input class="uk-input" type="text" name="id" placeholder="ID" {% if script.is_some() %}
+                value="{{ script.unwrap().id }}" {% endif %} />
+        </div>
+
+        <div class="uk-margin">
+            <input class="uk-input" type="text" name="name" placeholder="Name" {% if script.is_some() %}
+                value="{{ script.unwrap().name }}" {% endif %} />
+        </div>
+
+        <!-- Parameters Section -->
+        <div class="uk-margin">
+            <h4>Parameters</h4>
+            <div id="parameters">
+                {% if script.is_some() %}
+                {% for param in script.unwrap().parameters %}
+                <div class="uk-margin">
+                    <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].name"
+                        placeholder="Parameter Name" value="{{ param.name }}" />
+                    <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].description"
+                        placeholder="Description" value="{{ param.description }}" />
+                    <label><input class="uk-checkbox" type="checkbox" name="parameters[].required" {% if param.required
+                            %}checked{% endif %}> Required</label>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <button type="button" class="uk-button uk-button-default" onclick="addParameter()">Add Parameter</button>
+        </div>
+
+        <!-- Steps Section -->
+        <div class="uk-margin">
+            <h4>Steps</h4>
+            <div id="steps">
+                {% if script.is_some() %}
+                {% for step in script.unwrap().steps %}
+                <div class="uk-margin">
+                    <input class="uk-input uk-margin-small-bottom" type="text" name="steps[].name"
+                        placeholder="Step Name" value="{{ step.name }}" />
+                    <select class="uk-select" name="steps[].type" onchange="updateStepValue(this)">
+                        <option value="bash">Bash</option>
+                        <option value="git-clone">Git Clone</option>
+                        <option value="sync">Sync</option>
+                    </select>
+                    <div class="step-value">
+                        {% include "script-value.html" %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <button type="button" class="uk-button uk-button-default" onclick="addStep()">Add Step</button>
+        </div>
+
+        <div class="uk-margin">
+            <button class="uk-button uk-button-primary">Submit</button>
+        </div>
+    </fieldset>
+</form>
+
+<script>
+    function addParameter() {
+        const paramDiv = document.createElement('div');
+        paramDiv.className = 'uk-margin';
+        paramDiv.innerHTML = `
+        <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].name" placeholder="Parameter Name" />
+        <input class="uk-input uk-margin-small-bottom" type="text" name="parameters[].description" placeholder="Description" />
+        <label><input class="uk-checkbox" type="checkbox" name="parameters[].required"> Required</label>
+    `;
+        document.getElementById('parameters').appendChild(paramDiv);
+    }
+
+    function addStep() {
+        const stepDiv = document.createElement('div');
+        stepDiv.className = 'uk-margin';
+        stepDiv.innerHTML = `
+        <input class="uk-input uk-margin-small-bottom" type="text" name="steps[].name" placeholder="Step Name" />
+        <select class="uk-select" name="steps[].type" onchange="updateStepValue(this)">
+            <option value="bash">Bash</option>
+            <option value="git-clone">Git Clone</option>
+            <option value="sync">Sync</option>
+        </select>
+        <div class="step-value"></div>
+    `;
+        document.getElementById('steps').appendChild(stepDiv);
+        updateStepValue(stepDiv.querySelector('select'));
+    }
+
+    function updateStepValue(select) {
+        const valueDiv = select.parentElement.querySelector('.step-value');
+        htmx.ajax('GET', '/template/script-value?type=' + select.value, valueDiv);
+    }
+</script>
+
+{% endblock %}

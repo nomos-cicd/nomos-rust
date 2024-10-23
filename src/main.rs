@@ -14,6 +14,7 @@ use axum::{
     routing, Json, Router,
 };
 use credential::{Credential, CredentialType, YamlCredential};
+use script::{Script, ScriptType};
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 
@@ -45,6 +46,10 @@ async fn main() {
         .route("/credentials/create", routing::get(template_create_credential))
         .route("/credentials/:id", routing::get(template_update_credential))
         .route("/template/credential-value", routing::get(template_credential_value))
+        .route("/scripts", routing::get(template_scripts))
+        .route("/scripts/create", routing::get(template_create_script))
+        .route("/scripts/:id", routing::get(template_update_script))
+        .route("/template/script-value", routing::get(template_script_value))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -252,4 +257,75 @@ async fn template_credential_value(params: Query<CredentialValueQuery>) -> (Stat
     }
 
     (StatusCode::BAD_REQUEST, Html("Invalid credential type".to_string()))
+}
+
+#[derive(Template)]
+#[template(path = "scripts.html")]
+struct ScriptsTemplate<'a> {
+    title: &'a str,
+    scripts: Vec<Script>,
+}
+
+#[derive(Template)]
+#[template(path = "script.html")]
+struct ScriptTemplate<'a> {
+    title: &'a str,
+    script: Option<&'a Script>,
+    script_type: &'a ScriptType,
+}
+
+#[derive(Template)]
+#[template(path = "script-value.html")]
+struct ScriptValueTemplate<'a> {
+    script_type: &'a ScriptType,
+}
+
+async fn template_scripts() -> Html<String> {
+    let scripts = Script::get_all();
+    let template = ScriptsTemplate {
+        title: "Scripts",
+        scripts,
+    };
+    Html(template.render().unwrap())
+}
+
+async fn template_update_script(Path(id): Path<String>) -> Html<String> {
+    template_script(Some(axum::extract::Path(id)), "Scripts").await
+}
+
+async fn template_create_script() -> Html<String> {
+    template_script(None, "Create Script").await
+}
+
+async fn template_script(id: Option<Path<String>>, title: &str) -> Html<String> {
+    let script = if let Some(id) = id {
+        Script::get(id.as_str())
+    } else {
+        None
+    };
+
+    let template = ScriptTemplate {
+        title,
+        script: script.as_ref(),
+        script_type: &ScriptType::from_str("bash").unwrap(),
+    };
+    Html(template.render().unwrap())
+}
+
+#[derive(Deserialize)]
+struct ScriptValueQuery {
+    #[serde(rename = "type")]
+    script_type: String,
+}
+
+async fn template_script_value(params: Query<ScriptValueQuery>) -> (StatusCode, Html<String>) {
+    let script_type = ScriptType::from_str(&params.script_type);
+    if let Ok(script_type) = script_type {
+        let template = ScriptValueTemplate {
+            script_type: &script_type,
+        };
+        (StatusCode::OK, Html(template.render().unwrap()))
+    } else {
+        (StatusCode::BAD_REQUEST, Html("Invalid script type".to_string()))
+    }
 }

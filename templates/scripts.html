@@ -1,0 +1,30 @@
+{% extends "fragment-base.html" %}
+
+{% block body %}
+<table class="uk-table uk-table-middle uk-table-divider">
+    <thead>
+        <tr>
+            <th class="uk-width-small">ID</th>
+            <th>Name</th>
+            <th>Parameters</th>
+            <th>Steps</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for script in scripts %}
+        <tr>
+            <td>{{ script.id }}</td>
+            <td>{{ script.name }}</td>
+            <td>{{ "99" }}</td>
+            <td>{{ "99" }}</td>
+            <td>
+                <button class="uk-button uk-button-default" type="button">
+                    <a href="/scripts/{{ script.id }}">View</a>
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

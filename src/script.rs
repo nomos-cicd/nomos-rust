@@ -20,11 +20,11 @@ pub trait ScriptExecutor {
     ) -> Result<(), String>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, JsonSchema)]
 pub struct BashScript {
     pub code: String,
 }
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
 pub struct GitCloneScript {
     pub url: String,
     pub credential_id: Option<String>,
@@ -32,7 +32,7 @@ pub struct GitCloneScript {
 }
 
 /// Scans directory for credential, script and job files and syncs them with the database.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
 pub struct SyncScript {
     pub directory: String,
 }
@@ -47,6 +47,18 @@ pub enum ScriptType {
     #[serde(rename = "sync")]
     Sync(SyncScript),
 }
+
+impl ScriptType {
+    pub fn from_str(t: &str) -> Result<Self, String> {
+        match t {
+            "bash" => Ok(ScriptType::Bash(BashScript::default())),
+            "git-clone" => Ok(ScriptType::GitClone(GitCloneScript::default())),
+            "sync" => Ok(ScriptType::Sync(SyncScript::default())),
+            _ => Err(format!("Unknown script type: {}", t)),
+        }
+    }
+}
+
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(tag = "type", content = "value")]
