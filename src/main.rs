@@ -8,6 +8,7 @@ mod utils;
 
 use axum::{extract::Path, http::StatusCode, routing, Json, Router};
 use credential::YamlCredential;
+use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 async fn main() {
@@ -17,10 +18,12 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         .route("/credentials", routing::get(get_credentials))
+        .route("/credentials/:id", routing::get(get_credential))
         .route("/credentials", routing::post(create_credential))
         .route("/credentials/:id", routing::delete(delete_credential))
         .route("/credential-types", routing::get(get_credential_types))
         .route("/scripts", routing::get(get_scripts))
+        .route("/scripts/:id", routing::get(get_script))
         .route("/scripts", routing::post(create_script))
         .route("/scripts/:id", routing::delete(delete_script))
         .route(
@@ -28,11 +31,13 @@ async fn main() {
             routing::get(get_script_parameter_types),
         )
         .route("/jobs", routing::get(get_jobs))
+        .route("/jobs/:id", routing::get(get_job))
         .route("/jobs", routing::post(create_job))
         .route("/jobs/:id", routing::delete(delete_job))
         .route("/job-trigger-types", routing::get(get_job_trigger_types))
         .route("/job-results", routing::get(get_job_results))
-        .route("/job-results/:id", routing::get(get_job_result));
+        .route("/job-results/:id", routing::get(get_job_result))
+        .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -42,6 +47,15 @@ async fn main() {
 async fn get_credentials() -> Json<Vec<credential::Credential>> {
     let credentials = credential::Credential::get_all();
     Json(credentials)
+}
+
+async fn get_credential(Path(id): Path<String>) -> (StatusCode, Json<credential::Credential>) {
+    let credential = credential::Credential::get(id.as_str());
+    if credential.is_none() {
+        return (StatusCode::NOT_FOUND, Json(credential.unwrap()));
+    }
+
+    (StatusCode::OK, Json(credential.unwrap()))
 }
 
 async fn create_credential(Json(credential): Json<YamlCredential>) -> Json<credential::Credential> {
@@ -69,6 +83,15 @@ async fn get_scripts() -> Json<Vec<script::Script>> {
     Json(scripts)
 }
 
+async fn get_script(Path(id): Path<String>) -> (StatusCode, Json<script::Script>) {
+    let script = script::Script::get(id.as_str());
+    if script.is_none() {
+        return (StatusCode::NOT_FOUND, Json(script.unwrap()));
+    }
+
+    (StatusCode::OK, Json(script.unwrap()))
+}
+
 async fn create_script(Json(script): Json<script::Script>) -> Json<script::Script> {
     script.sync(None);
     Json(script)
@@ -91,6 +114,15 @@ async fn get_script_parameter_types() -> Json<serde_json::Value> {
 async fn get_jobs() -> Json<Vec<job::Job>> {
     let jobs = job::Job::get_all();
     Json(jobs)
+}
+
+async fn get_job(Path(id): Path<String>) -> (StatusCode, Json<job::Job>) {
+    let job = job::Job::get(id.as_str());
+    if job.is_none() {
+        return (StatusCode::NOT_FOUND, Json(job.unwrap()));
+    }
+
+    (StatusCode::OK, Json(job.unwrap()))
 }
 
 async fn create_job(Json(job): Json<job::Job>) -> Json<job::Job> {
