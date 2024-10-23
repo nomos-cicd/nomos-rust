@@ -2,7 +2,9 @@ id: test-job
 name: Test Job
 parameters:
   - name: test_param
-    default: "1"
+    default:
+      value: "1"
+      type: string
 triggers:
   - type: manual
   - type: github

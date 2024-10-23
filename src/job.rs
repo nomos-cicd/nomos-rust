@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
 use crate::{
     log::{JobLogger, LogLevel},
-    script::{Script, ScriptExecutor, ScriptStep},
+    script::{Script, ScriptExecutor, ScriptParameterType, ScriptStep},
 };
 
 use chrono::{DateTime, Utc};
@@ -32,7 +32,7 @@ pub enum TriggerType {
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct JobParameterDefinition {
     pub name: String,
-    pub default: Option<String>,
+    pub default: Option<ScriptParameterType>,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -89,13 +89,7 @@ impl TryFrom<PathBuf> for Job {
 impl From<&Job> for JobResult {
     fn from(job: &Job) -> Self {
         let steps: Vec<ScriptStep> = Script::get(&job.script_id)
-            .map(|script| {
-                script
-                    .steps
-                    .iter()
-                    .map(ScriptStep::from)
-                    .collect()
-            })
+            .map(|script| script.steps.iter().map(ScriptStep::from).collect())
             .unwrap();
         JobResult {
             job_id: job.id.clone(),
@@ -109,13 +103,7 @@ impl From<&Job> for JobResult {
 impl From<(&Job, &Script)> for JobResult {
     fn from((job, _script): (&Job, &Script)) -> Self {
         let steps: Vec<ScriptStep> = Script::get(&job.script_id)
-            .map(|script| {
-                script
-                    .steps
-                    .iter()
-                    .map(ScriptStep::from)
-                    .collect()
-            })
+            .map(|script| script.steps.iter().map(ScriptStep::from).collect())
             .unwrap();
         JobResult {
             job_id: job.id.clone(),
@@ -290,11 +278,17 @@ impl Job {
                 || existing_job.script_id != self.script_id
             {
                 self.save();
-                if let Some(job_result) = job_result { job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id)) }
-            } else if let Some(job_result) = job_result { job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id)) }
+                if let Some(job_result) = job_result {
+                    job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id))
+                }
+            } else if let Some(job_result) = job_result {
+                job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id))
+            }
         } else {
             self.save();
-            if let Some(job_result) = job_result { job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id)) }
+            if let Some(job_result) = job_result {
+                job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id))
+            }
         }
     }
 
@@ -313,14 +307,17 @@ impl Job {
             .unwrap();
     }
 
-    pub fn execute(&self, parameters: HashMap<String, String>) -> Result<JobResult, String> {
+    pub fn execute(
+        &self,
+        parameters: HashMap<String, ScriptParameterType>,
+    ) -> Result<JobResult, String> {
         let script = Script::get(&self.script_id).ok_or("Could not get script")?;
         self.execute_with_script(parameters, &script)
     }
 
     pub fn execute_with_script(
         &self,
-        parameters: HashMap<String, String>,
+        parameters: HashMap<String, ScriptParameterType>,
         script: &Script,
     ) -> Result<JobResult, String> {
         let mut merged_parameters = parameters.clone();

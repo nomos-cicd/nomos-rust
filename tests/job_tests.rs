@@ -1,13 +1,17 @@
 use std::path::PathBuf;
 
 use nomos_rust::job::Job;
-use nomos_rust::script::Script;
+use nomos_rust::script::{Script, ScriptParameterType};
 
 #[test]
 fn read_yml() {
     let path_buf = PathBuf::from("tests/jobs/test-job.yml");
     let job = Job::try_from(path_buf);
     assert!(job.is_ok());
+    assert_eq!(
+        job.unwrap().parameters[0].default,
+        Some(ScriptParameterType::String("1".to_string()))
+    );
 }
 
 #[test]

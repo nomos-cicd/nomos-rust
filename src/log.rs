@@ -7,6 +7,7 @@ use std::path::PathBuf;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LogLevel {
     Info,
+    Warning,
     Error,
 }
 

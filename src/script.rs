@@ -12,7 +12,7 @@ use crate::{log, settings};
 pub trait ScriptExecutor {
     fn execute(
         &self,
-        parameters: &mut HashMap<String, String>,
+        parameters: &mut HashMap<String, ScriptParameterType>,
         directory: PathBuf,
         step_name: &str,
         job_result: &mut JobResult,
@@ -200,13 +200,27 @@ impl From<&YamlScriptStep> for ScriptStep {
 impl ScriptExecutor for BashScript {
     fn execute(
         &self,
-        parameters: &mut HashMap<String, String>,
+        parameters: &mut HashMap<String, ScriptParameterType>,
         directory: PathBuf,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
         let mut replaced_code = self.code.clone();
         for (key, value) in parameters.iter() {
+            let value_str;
+            let value = match value {
+                ScriptParameterType::String(s) => s,
+                ScriptParameterType::Password(p) => p,
+                ScriptParameterType::Credential(c) => c,
+                ScriptParameterType::Boolean(b) => {
+                    value_str = b.to_string();
+                    &value_str
+                }
+                ScriptParameterType::Number(n) => {
+                    value_str = n.to_string();
+                    &value_str
+                }
+            };
             replaced_code = replaced_code.replace(key, value);
         }
 
@@ -233,7 +247,7 @@ impl ScriptExecutor for BashScript {
 impl ScriptExecutor for GitCloneScript {
     fn execute(
         &self,
-        parameters: &mut HashMap<String, String>,
+        parameters: &mut HashMap<String, ScriptParameterType>,
         directory: PathBuf,
         step_name: &str,
         job_result: &mut JobResult,
@@ -241,7 +255,11 @@ impl ScriptExecutor for GitCloneScript {
         let mut url = self.url.clone();
         let is_variable = url.starts_with("$parameters.");
         if is_variable {
-            url = parameters.get(&url).cloned().unwrap_or_default();
+            let p = parameters.get(&url).cloned();
+            match p {
+                Some(ScriptParameterType::String(s)) => url = s,
+                _ => return Err("Could not get url".to_string()),
+            }
         }
 
         let mut credential_id = self.credential_id.clone();
@@ -249,7 +267,13 @@ impl ScriptExecutor for GitCloneScript {
             .as_ref()
             .map_or(false, |id| id.starts_with("$parameters."));
         if is_variable {
-            credential_id = parameters.get(credential_id.as_ref().unwrap()).cloned();
+            let p = parameters.get(credential_id.as_ref().unwrap()).cloned();
+            match p {
+                Some(ScriptParameterType::Credential(s)) => credential_id = Some(s),
+                _ => {
+                    credential_id = None;
+                }
+            }
         }
 
         let mut branch = self.branch.clone();
@@ -257,7 +281,17 @@ impl ScriptExecutor for GitCloneScript {
             .as_ref()
             .map_or(false, |b| b.starts_with("$parameters."));
         if is_variable {
-            branch = branch.and_then(|b| parameters.get(&b).cloned());
+            let p = parameters.get(branch.as_ref().unwrap()).cloned();
+            match p {
+                Some(ScriptParameterType::String(s)) => branch = Some(s),
+                _ => {
+                    branch = None;
+                    job_result.add_log(
+                        log::LogLevel::Warning,
+                        format!("Could not get branch, using default: {:?}", branch),
+                    );
+                },
+            }
         } else if branch.is_none() {
             branch = "main".to_string().into();
         }
@@ -278,7 +312,7 @@ impl ScriptExecutor for GitCloneScript {
 
         parameters.insert(
             format!("$steps.{}.git-clone.directory", step_name),
-            cloned_dir.to_str().unwrap().to_string(),
+            ScriptParameterType::String(cloned_dir.to_str().unwrap().to_string()),
         );
 
         Ok(())
@@ -288,19 +322,18 @@ impl ScriptExecutor for GitCloneScript {
 impl ScriptExecutor for SyncScript {
     fn execute(
         &self,
-        parameters: &mut HashMap<String, String>,
+        parameters: &mut HashMap<String, ScriptParameterType>,
         directory: PathBuf,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
         let is_variable = self.directory.starts_with('$');
         let mut param_directory = if is_variable {
-            PathBuf::from(
-                parameters
-                    .get(&self.directory)
-                    .cloned()
-                    .expect("Could not get directory"),
-            )
+            let p = parameters.get(&self.directory).cloned();
+            match p {
+                Some(ScriptParameterType::String(s)) => PathBuf::from(s),
+                _ => return Err("Could not get directory".to_string()),
+            }
         } else {
             PathBuf::from(&self.directory)
         };
@@ -320,7 +353,7 @@ impl ScriptExecutor for SyncScript {
 impl ScriptExecutor for ScriptType {
     fn execute(
         &self,
-        parameters: &mut HashMap<String, String>,
+        parameters: &mut HashMap<String, ScriptParameterType>,
         directory: PathBuf,
         step_name: &str,
         job_result: &mut JobResult,
@@ -338,7 +371,7 @@ impl ScriptExecutor for ScriptType {
 impl ScriptExecutor for ScriptStep {
     fn execute(
         &self,
-        parameters: &mut HashMap<String, String>,
+        parameters: &mut HashMap<String, ScriptParameterType>,
         directory: PathBuf,
         step_name: &str,
         job_result: &mut JobResult,
