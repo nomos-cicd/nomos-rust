@@ -37,17 +37,27 @@ RUN apk add --no-cache \
 # Create a non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
+# Create necessary directories
+RUN mkdir -p /var/lib/nomos && \
+    chown -R appuser:appgroup /var/lib/nomos
+
 # Set working directory
 WORKDIR /app
 
 # Copy the statically linked binary
 COPY --from=app-builder /app/target/x86_64-unknown-linux-musl/release/nomos-rust .
 
+# Copy data contents
+COPY data/ /var/lib/nomos/
+
 # Show binary dependencies
 RUN ldd nomos-rust || true
 
-# Change ownership of the binary
-RUN chown -R appuser:appgroup /app
+# Change ownership of the binary and data
+RUN chown -R appuser:appgroup /app /var/lib/nomos
+
+# Expose port 3000
+EXPOSE 3000
 
 # Switch to non-root user
 USER appuser
