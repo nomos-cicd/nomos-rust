@@ -18,27 +18,27 @@ async fn main() {
 
     // build our application with a route
     let app = Router::new()
-        .route("/credentials", routing::get(get_credentials))
-        .route("/credentials/:id", routing::get(get_credential))
-        .route("/credentials", routing::post(create_credential))
-        .route("/credentials/:id", routing::delete(delete_credential))
-        .route("/credential-types", routing::get(get_credential_types))
-        .route("/scripts", routing::get(get_scripts))
-        .route("/scripts/:id", routing::get(get_script))
-        .route("/scripts", routing::post(create_script))
-        .route("/scripts/:id", routing::delete(delete_script))
+        .route("/api/credentials", routing::get(get_credentials))
+        .route("/api/credentials/:id", routing::get(get_credential))
+        .route("/api/credentials", routing::post(create_credential))
+        .route("/api/credentials/:id", routing::delete(delete_credential))
+        .route("/api/credential-types", routing::get(get_credential_types))
+        .route("/api/scripts", routing::get(get_scripts))
+        .route("/api/scripts/:id", routing::get(get_script))
+        .route("/api/scripts", routing::post(create_script))
+        .route("/api/scripts/:id", routing::delete(delete_script))
         .route(
             "/script-parameter-types",
             routing::get(get_script_parameter_types),
         )
-        .route("/jobs", routing::get(get_jobs))
-        .route("/jobs/:id", routing::get(get_job))
-        .route("/jobs", routing::post(create_job))
-        .route("/jobs/:id", routing::delete(delete_job))
-        .route("/job-trigger-types", routing::get(get_job_trigger_types))
-        .route("/job-results", routing::get(get_job_results))
-        .route("/job-results/:id", routing::get(get_job_result))
-        .route("/askama-test", routing::get(askama_test))
+        .route("/api/jobs", routing::get(get_jobs))
+        .route("/api/jobs/:id", routing::get(get_job))
+        .route("/api/jobs", routing::post(create_job))
+        .route("/api/jobs/:id", routing::delete(delete_job))
+        .route("/api/job-trigger-types", routing::get(get_job_trigger_types))
+        .route("/api/job-results", routing::get(get_job_results))
+        .route("/api/job-results/:id", routing::get(get_job_result))
+        .route("/credentials", routing::get(template_credentials))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -163,11 +163,11 @@ struct CredentialsTemplate<'a> {
     credentials: Vec<Credential>,
 }
 
-async fn askama_test() -> Html<String> {
+async fn template_credentials() -> Html<String> {
     let credentials = Credential::get_all();
-    let hello = CredentialsTemplate {
+    let template = CredentialsTemplate {
         title: "Credentials",
         credentials,
     };
-    Html(hello.render().unwrap())
+    Html(template.render().unwrap())
 }
