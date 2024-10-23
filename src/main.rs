@@ -24,7 +24,9 @@ async fn main() {
         .route("/scripts/:id", routing::delete(delete_script))
         .route("/jobs", routing::get(get_jobs))
         .route("/jobs", routing::post(create_job))
-        .route("/jobs/:id", routing::delete(delete_job));
+        .route("/jobs/:id", routing::delete(delete_job))
+        .route("/job-results", routing::get(get_job_results))
+        .route("/job-results/:id", routing::get(get_job_result));
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -57,7 +59,6 @@ async fn get_scripts() -> Json<Vec<script::Script>> {
 }
 
 async fn create_script(Json(script): Json<script::Script>) -> Json<script::Script> {
-    let script = script::Script::try_from(script).unwrap();
     script.sync(None);
     Json(script)
 }
@@ -77,7 +78,6 @@ async fn get_jobs() -> Json<Vec<job::Job>> {
 }
 
 async fn create_job(Json(job): Json<job::Job>) -> Json<job::Job> {
-    let job = job::Job::try_from(job).unwrap();
     job.sync(None);
     Json(job)
 }
@@ -89,4 +89,14 @@ async fn delete_job(Path(id): Path<String>) -> StatusCode {
     }
     job.unwrap().delete();
     StatusCode::NO_CONTENT
+}
+
+async fn get_job_results() -> Json<Vec<job::JobResult>> {
+    let job_results = job::JobResult::get_all();
+    Json(job_results)
+}
+
+async fn get_job_result(Path(id): Path<String>) -> Json<job::JobResult> {
+    let job_result = job::JobResult::get(id.as_str());
+    Json(job_result.unwrap())
 }

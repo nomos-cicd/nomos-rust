@@ -1,11 +1,18 @@
 id: test-script
 name: Test Script
 parameters:
-  - name: test_param
+  - name: test_param1
     description: Test parameter
-    default: "1"
+    default:
+      type: number
+      value: 5
     required: true
-    type: int
+  - name: test_param2
+    description: Test parameter
+    default:
+      type: boolean
+      value: true
+    required: true
 steps:
   - name: Test Step
     values:

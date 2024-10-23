@@ -4,15 +4,21 @@ parameters:
   - name: git_clone_url
     description: Git clone URL
     required: true
-    type: string
+    default:
+      type: string
+      value: ""
   - name: git_credential_id
     description: Git credential ID
     required: false
-    type: string
+    default:
+      type: credential
+      value: ""
   - name: git_branch
     description: Git branch
     required: false
-    type: string
+    default:
+      type: string
+      value: main
 steps:
   - name: Clone
     values:

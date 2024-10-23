@@ -47,12 +47,27 @@ pub enum ScriptType {
     Sync(SyncScript),
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(tag = "type", content = "value")]
+pub enum ScriptParameterType {
+    #[serde(rename = "string")]
+    String(String),
+    #[serde(rename = "boolean")]
+    Boolean(bool),
+    #[serde(rename = "number")]
+    Number(i64),
+    #[serde(rename = "password")]
+    Password(String),
+    #[serde(rename = "credential")]
+    Credential(String),
+}
+
 #[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct ScriptParameter {
     pub name: String,
     pub description: String,
     pub required: bool,
-    pub default: Option<String>,
+    pub default: Option<ScriptParameterType>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -105,14 +120,20 @@ impl Script {
         if let Some(existing_script) = existing_script {
             if existing_script != *self {
                 self.save();
-                if let Some(job_result) = job_result { job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id)) }
-            } else if let Some(job_result) = job_result { job_result.add_log(
-                log::LogLevel::Info,
-                format!("No changes in script {:?}", self.id),
-            ) }
+                if let Some(job_result) = job_result {
+                    job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id))
+                }
+            } else if let Some(job_result) = job_result {
+                job_result.add_log(
+                    log::LogLevel::Info,
+                    format!("No changes in script {:?}", self.id),
+                )
+            }
         } else {
             self.save();
-            if let Some(job_result) = job_result { job_result.add_log(log::LogLevel::Info, format!("Created script {:?}", self.id)) }
+            if let Some(job_result) = job_result {
+                job_result.add_log(log::LogLevel::Info, format!("Created script {:?}", self.id))
+            }
         }
     }
 
