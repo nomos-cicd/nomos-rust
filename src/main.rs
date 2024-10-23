@@ -35,10 +35,15 @@ async fn main() {
         .route("/api/jobs/:id", routing::get(get_job))
         .route("/api/jobs", routing::post(create_job))
         .route("/api/jobs/:id", routing::delete(delete_job))
-        .route("/api/job-trigger-types", routing::get(get_job_trigger_types))
+        .route(
+            "/api/job-trigger-types",
+            routing::get(get_job_trigger_types),
+        )
         .route("/api/job-results", routing::get(get_job_results))
         .route("/api/job-results/:id", routing::get(get_job_result))
+
         .route("/credentials", routing::get(template_credentials))
+        .route("/credentials/:id", routing::get(template_credential))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -168,6 +173,22 @@ async fn template_credentials() -> Html<String> {
     let template = CredentialsTemplate {
         title: "Credentials",
         credentials,
+    };
+    Html(template.render().unwrap())
+}
+
+#[derive(Template)]
+#[template(path = "credential.html")]
+struct CredentialTemplate<'a> {
+    title: &'a str,
+    credential: Option<&'a Credential>,
+}
+
+async fn template_credential(Path(id): Path<String>) -> Html<String> {
+    let credential = Credential::get(id.as_str());
+    let template = CredentialTemplate {
+        title: "Credential",
+        credential: credential.as_ref(),
     };
     Html(template.render().unwrap())
 }

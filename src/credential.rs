@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::PathBuf};
+use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
@@ -33,7 +33,7 @@ impl CredentialType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Credential {
     pub id: String,
     pub value: CredentialType,
