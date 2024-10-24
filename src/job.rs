@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
 use crate::{
     log::{JobLogger, LogLevel},
-    script::{Script, ScriptExecutor, ScriptParameterType, ScriptStep},
+    script::{models::{Script, ScriptStep}, ScriptExecutor, ScriptParameterType},
 };
 
 use chrono::{DateTime, Utc};
@@ -217,6 +217,7 @@ impl JobResult {
         serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
     }
 
+    #[allow(dead_code)]
     pub async fn wait_for_completion(id: &str) -> Result<Self, String> {
         let mut job_result = JobResult::get(id).ok_or("Could not get job result")?;
         while job_result.finished_at.is_none() {

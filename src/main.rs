@@ -1,6 +1,6 @@
 mod credential;
-mod git;
 mod docker;
+mod git;
 mod job;
 mod log;
 mod script;
@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use credential::{Credential, CredentialType, YamlCredential};
 use job::JobResult;
 use log::LogLevel;
-use script::Script;
+use script::models::Script;
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 
@@ -102,13 +102,13 @@ async fn get_credential_types() -> Json<serde_json::Value> {
     Json(credential_types)
 }
 
-async fn get_scripts() -> Json<Vec<script::Script>> {
-    let scripts = script::Script::get_all().unwrap();
+async fn get_scripts() -> Json<Vec<Script>> {
+    let scripts = Script::get_all().unwrap();
     Json(scripts)
 }
 
-async fn get_script(Path(id): Path<String>) -> (StatusCode, Json<script::Script>) {
-    let script = script::Script::get(id.as_str());
+async fn get_script(Path(id): Path<String>) -> (StatusCode, Json<Script>) {
+    let script = Script::get(id.as_str());
     if script.is_none() {
         return (StatusCode::NOT_FOUND, Json(script.unwrap()));
     }
@@ -116,15 +116,15 @@ async fn get_script(Path(id): Path<String>) -> (StatusCode, Json<script::Script>
     (StatusCode::OK, Json(script.unwrap()))
 }
 
-async fn create_script(headers: HeaderMap, body: String) -> (StatusCode, Json<script::Script>) {
+async fn create_script(headers: HeaderMap, body: String) -> (StatusCode, Json<Script>) {
     let content_type = headers.get("content-type");
     if content_type.is_none() {
-        return (StatusCode::BAD_REQUEST, Json(script::Script::default()));
+        return (StatusCode::BAD_REQUEST, Json(Script::default()));
     }
 
     let content_type = content_type.unwrap().to_str().unwrap();
     if content_type != "application/yaml" {
-        return (StatusCode::BAD_REQUEST, Json(script::Script::default()));
+        return (StatusCode::BAD_REQUEST, Json(Script::default()));
     }
 
     let script: Script = serde_yaml::from_str(body.as_str()).unwrap();
@@ -133,7 +133,7 @@ async fn create_script(headers: HeaderMap, body: String) -> (StatusCode, Json<sc
 }
 
 async fn delete_script(Path(id): Path<String>) -> StatusCode {
-    let script = script::Script::get(id.as_str());
+    let script = Script::get(id.as_str());
     if script.is_none() {
         return StatusCode::NOT_FOUND;
     }
@@ -352,7 +352,7 @@ async fn template_script(id: Option<Path<String>>, title: &str) -> Html<String> 
         script_yaml = Some(serde_yaml::to_string(script).unwrap());
     }
 
-    // let json_schema = script::Script::get_json_schema();
+    // let json_schema = Script::get_json_schema();
     // let json_schema_str = serde_json::to_string(&json_schema).unwrap();
 
     let template = ScriptTemplate {

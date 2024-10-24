@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{job::JobResult, log};
+use crate::{job::JobResult, log::LogLevel};
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Default, Debug)]
 pub struct TextCredentialParameter {
@@ -104,15 +104,15 @@ impl Credential {
             if existing_credential != *self {
                 self.save();
                 if let Some(job_result) = job_result {
-                    job_result.add_log(log::LogLevel::Info, format!("Updated credential {:?}", self.id))
+                    job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
                 }
             } else if let Some(job_result) = job_result {
-                job_result.add_log(log::LogLevel::Info, format!("No changes in credential {:?}", self.id))
+                job_result.add_log(LogLevel::Info, format!("No changes in credential {:?}", self.id))
             }
         } else {
             self.save();
             if let Some(job_result) = job_result {
-                job_result.add_log(log::LogLevel::Info, format!("Created credential {:?}", self.id))
+                job_result.add_log(LogLevel::Info, format!("Created credential {:?}", self.id))
             }
         }
     }

@@ -5,8 +5,8 @@ use serde::Deserialize;
 use crate::{
     credential::{Credential, YamlCredential},
     job::{Job, JobResult},
-    log,
-    script::Script,
+    log::LogLevel,
+    script::models::Script,
 };
 
 #[derive(Debug, Deserialize)]
@@ -20,7 +20,7 @@ impl Settings {
         for yaml_credential in &self.credentials {
             let credential = Credential::try_from(yaml_credential);
             if let Err(e) = credential {
-                job_result.add_log(log::LogLevel::Error, format!("Error syncing credential: {:?}", e));
+                job_result.add_log(LogLevel::Error, format!("Error syncing credential: {:?}", e));
                 continue;
             }
 
@@ -65,7 +65,7 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
     for script in scripts {
         if !script_ids.contains(&script.id) {
             script.delete();
-            job_result.add_log(log::LogLevel::Info, format!("Deleted script {:?}", script.id));
+            job_result.add_log(LogLevel::Info, format!("Deleted script {:?}", script.id));
         }
     }
 
@@ -82,7 +82,7 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
     for job in jobs {
         if !job_ids.contains(&job.id) && !job.read_only {
             job.delete();
-            job_result.add_log(log::LogLevel::Info, format!("Deleted job {:?}", job.id));
+            job_result.add_log(LogLevel::Info, format!("Deleted job {:?}", job.id));
         }
     }
 

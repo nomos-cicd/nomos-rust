@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use nomos_rust::script::{Script, ScriptParameterType};
+use nomos_rust::script::{models::Script, ScriptParameterType};
 
 #[test]
 fn read_yml() {

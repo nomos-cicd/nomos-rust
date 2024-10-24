@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use nomos_rust::job::{Job, JobResult};
-use nomos_rust::script::{Script, ScriptParameterType};
+use nomos_rust::script::models::Script;
+use nomos_rust::script::ScriptParameterType;
 
 #[test]
 fn read_yml() {
