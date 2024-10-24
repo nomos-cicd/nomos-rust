@@ -9,12 +9,12 @@ mod utils;
 use askama::Template;
 use axum::{
     extract::{Path, Query},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::Html,
     routing, Json, Router,
 };
 use credential::{Credential, CredentialType, YamlCredential};
-use script::{Script, ScriptType};
+use script::Script;
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 
@@ -42,6 +42,7 @@ async fn main() {
         .route("/api/job-trigger-types", routing::get(get_job_trigger_types))
         .route("/api/job-results", routing::get(get_job_results))
         .route("/api/job-results/:id", routing::get(get_job_result))
+        .route("/", routing::get(template_credentials))
         .route("/credentials", routing::get(template_credentials))
         .route("/credentials/create", routing::get(template_create_credential))
         .route("/credentials/:id", routing::get(template_update_credential))
@@ -49,7 +50,6 @@ async fn main() {
         .route("/scripts", routing::get(template_scripts))
         .route("/scripts/create", routing::get(template_create_script))
         .route("/scripts/:id", routing::get(template_update_script))
-        .route("/template/script-value", routing::get(template_script_value))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -105,9 +105,20 @@ async fn get_script(Path(id): Path<String>) -> (StatusCode, Json<script::Script>
     (StatusCode::OK, Json(script.unwrap()))
 }
 
-async fn create_script(Json(script): Json<script::Script>) -> Json<script::Script> {
+async fn create_script(headers: HeaderMap, body: String) -> (StatusCode, Json<script::Script>) {
+    let content_type = headers.get("content-type");
+    if content_type.is_none() {
+        return (StatusCode::BAD_REQUEST, Json(script::Script::default()));
+    }
+
+    let content_type = content_type.unwrap().to_str().unwrap();
+    if content_type != "application/yaml" {
+        return (StatusCode::BAD_REQUEST, Json(script::Script::default()));
+    }
+
+    let script: Script = serde_yaml::from_str(body.as_str()).unwrap();
     script.sync(None);
-    Json(script)
+    (StatusCode::CREATED, Json(script))
 }
 
 async fn delete_script(Path(id): Path<String>) -> StatusCode {
@@ -270,14 +281,7 @@ struct ScriptsTemplate<'a> {
 #[template(path = "script.html")]
 struct ScriptTemplate<'a> {
     title: &'a str,
-    script: Option<&'a Script>,
-}
-
-#[derive(Template)]
-#[template(path = "script-value.html")]
-struct ScriptValueTemplate<'a> {
-    script_type: &'a ScriptType,
-    name_prefix: &'a str,
+    script: Option<&'a str>,
 }
 
 async fn template_scripts() -> Html<String> {
@@ -304,28 +308,14 @@ async fn template_script(id: Option<Path<String>>, title: &str) -> Html<String> 
         None
     };
 
+    let mut script_yaml = None;
+    if let Some(script) = script.as_ref() {
+        script_yaml = Some(serde_yaml::to_string(script).unwrap());
+    }
+
     let template = ScriptTemplate {
         title,
-        script: script.as_ref(),
+        script: script_yaml.as_deref(),
     };
     Html(template.render().unwrap())
-}
-
-#[derive(Deserialize)]
-struct ScriptValueQuery {
-    #[serde(rename = "type")]
-    script_type: String,
-}
-
-async fn template_script_value(params: Query<ScriptValueQuery>) -> (StatusCode, Html<String>) {
-    let script_type = ScriptType::from_str(&params.script_type);
-    if let Ok(script_type) = script_type {
-        let template = ScriptValueTemplate {
-            script_type: &script_type,
-            name_prefix: "steps[].values[]",
-        };
-        (StatusCode::OK, Html(template.render().unwrap()))
-    } else {
-        (StatusCode::BAD_REQUEST, Html("Invalid script type".to_string()))
-    }
 }

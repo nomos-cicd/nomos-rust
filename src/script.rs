@@ -94,7 +94,7 @@ pub struct ScriptStep {
     pub finished_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct Script {
     pub id: String,
     pub name: String,
