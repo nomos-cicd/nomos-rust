@@ -75,7 +75,7 @@ pub enum ScriptParameterType {
     Credential(String),
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Default, JsonSchema, Debug)]
 pub struct ScriptParameter {
     pub name: String,
     pub description: String,
@@ -94,7 +94,7 @@ pub struct ScriptStep {
     pub finished_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default, JsonSchema)]
 pub struct Script {
     pub id: String,
     pub name: String,
@@ -164,6 +164,11 @@ impl Script {
             .map_err(|e| e.to_string())
             .unwrap();
     }
+
+    pub fn get_json_schema() -> serde_json::Value {
+        let schema = schema_for!(Script);
+        serde_json::to_value(schema).unwrap()
+    }
 }
 
 impl TryFrom<PathBuf> for Script {
@@ -201,7 +206,7 @@ impl ScriptParameterType {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Default, PartialEq, JsonSchema, Debug)]
 pub struct YamlScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,

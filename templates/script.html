@@ -14,7 +14,14 @@
 </form>
 
 <script>
+    function decodeHtmlString(html) {
+        const txt = document.createElement("textarea");
+        txt.innerHTML = html;
+        return txt.value;
+    }
+
     let value = `{% if script.is_some() %}{{ script.unwrap() }}{% else %}{% endif %}`;
+    value = decodeHtmlString(value).replace(/&quot;/g, '"');
 
     var editor = monaco.editor.create(document.getElementById('code-container'), {
         value,
