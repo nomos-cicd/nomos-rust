@@ -4,12 +4,8 @@
 
 <form method="post" action="/api/scripts" onsubmit="submitString(event, '#script', 'application/yaml')">
     <fieldset class="uk-fieldset">
-        <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Script</label>
-            <textarea class="uk-textarea w-full p-2 border rounded" id="script" placeholder="..."
-                rows="15">{% if script.is_some() %}{{ script.unwrap() }}{% endif %}</textarea>
-        </div>
-
+        <div id="code-container" style="width: 800px; height: 600px; border: 1px solid grey"></div>
+        <input type="hidden" id="script" name="script" value="">
 
         <div class="uk-margin">
             <button class="uk-button uk-button-primary">Submit</button>
@@ -18,27 +14,17 @@
 </form>
 
 <script>
-    const errorClasses = ['error-border']
-    document.addEventListener("DOMContentLoaded", (event) => {
-        document.getElementById('script').addEventListener('change', function (e) {
-            let anyError = false;
-            let content = null;
-            try {
-                content = window.globalThis.jsyaml.load(this.value);
-            } catch (error) {
-                anyError = true;
-            }
+    let value = `{% if script.is_some() %}{{ script.unwrap() }}{% else %}{% endif %}`;
 
-            if (anyError) {
-                this.classList.add(...errorClasses);
-                this.setAttribute('aria-invalid', 'true');
-            } else {
-                this.classList.remove(...errorClasses);
-                this.removeAttribute('aria-invalid');
-            }
-        });
+    var editor = monaco.editor.create(document.getElementById('code-container'), {
+        value,
+        language: 'yaml',
+        theme: 'vs-dark'
     });
 
+    editor.onDidChangeModelContent(() => {
+        document.querySelector('#script').value = editor.getValue();
+    });
 </script>
 
 {% endblock %}
