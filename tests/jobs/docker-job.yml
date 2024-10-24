@@ -1,0 +1,14 @@
+id: docker-build
+name: Docker build
+parameters:
+  - name: docker_image
+    default:
+      type: string
+      value: "nomos-test-image"
+  - name: docker_dockerfile
+    default:
+      type: string
+      value: "Dockerfile"
+triggers: []
+script_id: docker-script
+read_only: false

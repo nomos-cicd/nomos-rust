@@ -25,7 +25,7 @@ impl ParameterSubstitution for String {
                 .ok_or_else(|| "Missing closing bracket ')'".to_string())?;
 
             // Check if parameter is optional and result only contains the parameter reference
-            if optional && end == remaining.len() - 1 {
+            if optional && start == 0 && end == remaining.len() - 1 {
                 return Ok(None);
             }
 

@@ -1,0 +1,26 @@
+id: git-clone-script
+name: Git Clone Script
+parameters:
+  - name: docker_image
+    description: Image
+    required: true
+    default:
+      type: string
+      value: ""
+  - name: docker_dockerfile
+    description: Dockerfile
+    required: false
+    default:
+      type: string
+      value: ""
+steps:
+  - name: Clone
+    values:
+      - type: git-clone
+        url: git@github.com:karthequian/docker-helloworld.git
+        branch: master
+  - name: Build
+    values:
+      - type: docker-build
+        image: $(parameters.docker_image)
+        dockerfile: $(steps.Clone.git-clone.directory)/$(parameters.docker_dockerfile)

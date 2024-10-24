@@ -51,3 +51,20 @@ async fn git_clone_job() {
         assert!(step.finished_at > step.started_at);
     }
 }
+
+#[tokio::test]
+async fn docker_job() {
+    let path_buf = PathBuf::from("tests/jobs/docker-job.yml");
+    let job = Job::try_from(path_buf).unwrap();
+    let script = Script::try_from(PathBuf::from("tests/scripts/docker-script.yml")).unwrap();
+    let result = job.execute_with_script(Default::default(), &script).unwrap();
+    let result = JobResult::wait_for_completion(&result).await.unwrap();
+    assert!(result.finished_at.is_some());
+    assert!(result.is_success);
+    assert_eq!(result.steps.len(), 2);
+    for step in result.steps {
+        assert!(step.is_success);
+        assert!(step.is_started);
+        assert!(step.finished_at > step.started_at);
+    }
+}

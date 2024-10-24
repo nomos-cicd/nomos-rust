@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     job::JobResult,
-    script::{ScriptExecutor, ScriptParameterType},
+    script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
     settings,
 };
 
@@ -23,16 +23,13 @@ impl ScriptExecutor for SyncScript {
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
-        let is_variable = self.directory.starts_with('$');
-        let mut param_directory = if is_variable {
-            let p = parameters.get(&self.directory).cloned();
-            match p {
-                Some(ScriptParameterType::String(s)) => PathBuf::from(s),
-                _ => return Err("Could not get directory".to_string()),
-            }
-        } else {
-            PathBuf::from(&self.directory)
-        };
+        // Get directory with parameter substitution
+        let param_directory_str = self
+            .directory
+            .substitute_parameters(parameters, false)?
+            .ok_or("Directory is required")?;
+
+        let mut param_directory = PathBuf::from(param_directory_str);
 
         if !param_directory.exists() {
             return Err(format!("Directory does not exist: {:?}", param_directory));

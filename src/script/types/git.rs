@@ -25,7 +25,7 @@ impl ScriptExecutor for GitCloneScript {
         job_result: &mut JobResult,
     ) -> Result<(), String> {
         // Substitute parameters
-        let url = self.url.substitute_parameters(parameters, false)?.unwrap();
+        let url = self.url.substitute_parameters(parameters, false)?.ok_or("URL is required")?;
 
         let credential_id = match &self.credential_id {
             Some(id) => id.substitute_parameters(parameters, true)?,
@@ -51,7 +51,7 @@ impl ScriptExecutor for GitCloneScript {
 
         let mut cloned_dir = directory.clone().join(url.split('/').last().unwrap());
         if cloned_dir.to_str().unwrap().ends_with(".git") {
-            cloned_dir = cloned_dir.parent().unwrap().to_path_buf();
+            cloned_dir = PathBuf::from(cloned_dir.to_str().unwrap().strip_suffix(".git").unwrap());
         }
 
         parameters.insert(

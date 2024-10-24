@@ -18,7 +18,13 @@ pub fn docker_build(
     directory: PathBuf,
     job_result: &mut JobResult,
 ) -> Result<(), String> {
-    let command = format!("docker build -t {} -f {}", image, dockerfile.display());
+    let dockerfile_dir = dockerfile.parent().unwrap();
+    let command = format!(
+        "docker build {} -t {} -f {}",
+        dockerfile_dir.to_str().unwrap(),
+        image,
+        dockerfile.display()
+    );
     execute_command(&command, directory, job_result)
 }
 
