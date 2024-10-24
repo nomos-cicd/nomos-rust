@@ -243,23 +243,17 @@ impl ScriptExecutor for BashScript {
             replaced_code = replaced_code.replace(key, value);
         }
 
-        let mut cmd_code = String::new();
-        for line in replaced_code.lines() {
-            cmd_code.push_str(line);
-            if cfg!(target_os = "windows") {
-                cmd_code.push_str(" && ");
-            } else {
-                cmd_code.push_str(" ; ");
+        let binding = replaced_code.replace("\r\n", "\n");
+        let lines = binding.split('\n');
+        for line in lines {
+            if line.is_empty() {
+                continue;
             }
+            execute_command(line, directory.clone(), job_result)
+                .map_err(|e| format!("Error executing command: {}", e))?;
         }
 
-        if cmd_code.ends_with(" && ") {
-            cmd_code = cmd_code[..cmd_code.len() - 4].to_string();
-        } else if cmd_code.ends_with(" ; ") {
-            cmd_code = cmd_code[..cmd_code.len() - 3].to_string();
-        }
-
-        execute_command(&cmd_code, directory, job_result)
+        Ok(())
     }
 }
 

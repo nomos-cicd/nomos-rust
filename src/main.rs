@@ -1,5 +1,6 @@
 mod credential;
 mod git;
+mod docker;
 mod job;
 mod log;
 mod script;
