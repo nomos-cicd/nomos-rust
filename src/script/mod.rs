@@ -2,6 +2,7 @@ pub mod executor;
 pub mod models;
 pub mod parameter;
 pub mod types;
+pub mod utils;
 
 use std::path::PathBuf;
 

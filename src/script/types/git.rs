@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     git::git_clone,
     job::JobResult,
-    log::LogLevel,
-    script::{ScriptExecutor, ScriptParameterType},
+    script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
@@ -25,51 +24,25 @@ impl ScriptExecutor for GitCloneScript {
         step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
-        let mut url = self.url.clone();
-        let is_variable = url.starts_with("$parameters.");
-        if is_variable {
-            let p = parameters.get(&url).cloned();
-            match p {
-                Some(ScriptParameterType::String(s)) => url = s,
-                _ => return Err("Could not get url".to_string()),
-            }
-        }
+        // Substitute parameters
+        let url = self.url.substitute_parameters(parameters, false)?.unwrap();
 
-        let mut credential_id = self.credential_id.clone();
-        let is_variable = credential_id
-            .as_ref()
-            .map_or(false, |id| id.starts_with("$parameters."));
-        if is_variable {
-            let p = parameters.get(credential_id.as_ref().unwrap()).cloned();
-            match p {
-                Some(ScriptParameterType::Credential(s)) => credential_id = Some(s),
-                _ => {
-                    credential_id = None;
-                }
-            }
-        }
+        let credential_id = match &self.credential_id {
+            Some(id) => id.substitute_parameters(parameters, true)?,
+            None => None,
+        };
 
-        let mut branch = self.branch.clone();
-        let is_variable = branch.as_ref().map_or(false, |b| b.starts_with("$parameters."));
-        if is_variable {
-            let p = parameters.get(branch.as_ref().unwrap()).cloned();
-            match p {
-                Some(ScriptParameterType::String(s)) => branch = Some(s),
-                _ => {
-                    branch = None;
-                    job_result.add_log(
-                        LogLevel::Warning,
-                        format!("Could not get branch, using default: {:?}", branch),
-                    );
-                }
+        let branch = match &self.branch {
+            Some(b) => {
+                let res = b.substitute_parameters(parameters, false)?;
+                res.unwrap_or_else(|| "main".to_string())
             }
-        } else if branch.is_none() {
-            branch = "main".to_string().into();
-        }
+            None => "main".to_string(),
+        };
 
         git_clone(
             &url,
-            branch.unwrap().as_str(),
+            branch.as_str(),
             directory.clone(),
             credential_id.as_deref(),
             job_result,
@@ -82,7 +55,7 @@ impl ScriptExecutor for GitCloneScript {
         }
 
         parameters.insert(
-            format!("$steps.{}.git-clone.directory", step_name),
+            format!("steps.{}.git-clone.directory", step_name),
             ScriptParameterType::String(cloned_dir.to_str().unwrap().to_string()),
         );
 

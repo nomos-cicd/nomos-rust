@@ -2,7 +2,10 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 
 use crate::{
     log::{JobLogger, LogLevel},
-    script::{models::{Script, ScriptStep}, ScriptExecutor, ScriptParameterType},
+    script::{
+        models::{Script, ScriptStep},
+        ScriptExecutor, ScriptParameterType,
+    },
 };
 
 use chrono::{DateTime, Utc};
@@ -109,10 +112,8 @@ impl From<&Job> for JobResult {
 }
 
 impl From<(&Job, &Script)> for JobResult {
-    fn from((job, _script): (&Job, &Script)) -> Self {
-        let steps: Vec<ScriptStep> = Script::get(&job.script_id)
-            .map(|script| script.steps.iter().map(ScriptStep::from).collect())
-            .unwrap();
+    fn from((job, script): (&Job, &Script)) -> Self {
+        let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
         JobResult {
             job_id: job.id.clone(),
             steps: steps.clone(),
@@ -324,10 +325,10 @@ impl Job {
             panic!("Missing parameters: {}", missing_parameters.join(", "));
         }
 
-        // Add '$parameters.' to each parameter
+        // Add 'parameters.' to each parameter
         let mut merged_parameters_with_prefix = HashMap::new();
         for (key, value) in merged_parameters.clone() {
-            merged_parameters_with_prefix.insert(format!("$parameters.{}", key), value);
+            merged_parameters_with_prefix.insert(format!("parameters.{}", key), value);
         }
 
         let mut job_result = JobResult::from((self, script));
@@ -361,6 +362,10 @@ impl Job {
             let result = current_step.execute(parameters, directory.clone(), step_name.as_str(), job_result);
 
             if result.is_err() {
+                job_result.add_log(
+                    LogLevel::Error,
+                    format!("Error in step {}: {:?}", step_name, result.err().unwrap()),
+                );
                 job_result.finish_step(false);
                 is_success = false;
                 break;

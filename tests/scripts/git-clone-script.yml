@@ -23,12 +23,12 @@ steps:
   - name: Clone
     values:
       - type: git-clone
-        url: $parameters.git_clone_url
-        branch: $parameters.git_clone_branch
-        credential_id: $parameters.git_credential_id
+        url: $(parameters.git_clone_url)
+        branch: $(parameters.git_clone_branch)
+        credential_id: $(parameters.git_credential_id)
   - name: List files
     values:
       - type: bash
         code: |
-          echo $steps.Clone.git-clone.directory
+          echo $(steps.Clone.git-clone.directory)
           dir

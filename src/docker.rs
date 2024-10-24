@@ -14,11 +14,11 @@ pub fn docker_run(image: &str, args: Vec<&str>, directory: PathBuf, job_result: 
 /// docker build -t {image} -f {dockerfile}
 pub fn docker_build(
     image: &str,
-    dockerfile: &str,
+    dockerfile: PathBuf,
     directory: PathBuf,
     job_result: &mut JobResult,
 ) -> Result<(), String> {
-    let command = format!("docker build -t {} -f {}", image, dockerfile);
+    let command = format!("docker build -t {} -f {}", image, dockerfile.display());
     execute_command(&command, directory, job_result)
 }
 

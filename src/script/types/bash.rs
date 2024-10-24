@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     job::JobResult,
-    script::{ScriptExecutor, ScriptParameterType},
+    script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
     utils::execute_command,
 };
 
@@ -22,25 +22,10 @@ impl ScriptExecutor for BashScript {
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
-        let mut replaced_code = self.code.clone();
-        for (key, value) in parameters.iter() {
-            let value_str;
-            let value = match value {
-                ScriptParameterType::String(s) => s,
-                ScriptParameterType::Password(p) => p,
-                ScriptParameterType::Credential(c) => c,
-                ScriptParameterType::Boolean(b) => {
-                    value_str = b.to_string();
-                    &value_str
-                }
-                ScriptParameterType::Number(n) => {
-                    value_str = n.to_string();
-                    &value_str
-                }
-            };
-            replaced_code = replaced_code.replace(key, value);
-        }
+        // Replace all parameter references in the code
+        let replaced_code = self.code.substitute_parameters(parameters, false)?.unwrap();
 
+        // Split into lines and execute each command
         let binding = replaced_code.replace("\r\n", "\n");
         let lines = binding.split('\n');
         for line in lines {
