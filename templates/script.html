@@ -1,17 +1,20 @@
 {% extends "fragment-base.html" %}
 
 {% block body %}
+<div class="uk-container uk-margin">
+    <form method="post" action="/api/scripts" onsubmit="submitString(event, '#script', 'application/yaml')">
+        <fieldset class="uk-fieldset">
+            <div class="uk-margin">
+                <div id="code-container" style="width: 800px; height: 600px; border: 1px solid grey"></div>
+                <input type="hidden" id="script" name="script" value="">
+            </div>
 
-<form method="post" action="/api/scripts" onsubmit="submitString(event, '#script', 'application/yaml')">
-    <fieldset class="uk-fieldset">
-        <div id="code-container" style="width: 800px; height: 600px; border: 1px solid grey"></div>
-        <input type="hidden" id="script" name="script" value="">
-
-        <div class="uk-margin">
-            <button class="uk-button uk-button-primary">Submit</button>
-        </div>
-    </fieldset>
-</form>
+            <div class="uk-margin">
+                <button class="uk-button uk-button-primary">Submit</button>
+            </div>
+        </fieldset>
+    </form>
+</div>
 
 <script>
     function decodeHtmlString(html) {
