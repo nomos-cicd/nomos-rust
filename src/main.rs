@@ -50,6 +50,9 @@ async fn main() {
         .route("/scripts", routing::get(template_scripts))
         .route("/scripts/create", routing::get(template_create_script))
         .route("/scripts/:id", routing::get(template_update_script))
+        .route("/jobs", routing::get(template_jobs))
+        .route("/jobs/create", routing::get(template_create_job))
+        .route("/jobs/:id", routing::get(template_update_job))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -149,9 +152,20 @@ async fn get_job(Path(id): Path<String>) -> (StatusCode, Json<job::Job>) {
     (StatusCode::OK, Json(job.unwrap()))
 }
 
-async fn create_job(Json(job): Json<job::Job>) -> Json<job::Job> {
+async fn create_job(headers: HeaderMap, body: String) -> (StatusCode, Json<job::Job>) {
+    let content_type = headers.get("content-type");
+    if content_type.is_none() {
+        return (StatusCode::BAD_REQUEST, Json(job::Job::default()));
+    }
+
+    let content_type = content_type.unwrap().to_str().unwrap();
+    if content_type != "application/yaml" {
+        return (StatusCode::BAD_REQUEST, Json(job::Job::default()));
+    }
+
+    let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
     job.sync(None);
-    Json(job)
+    (StatusCode::CREATED, Json(job))
 }
 
 async fn delete_job(Path(id): Path<String>) -> StatusCode {
@@ -320,6 +334,58 @@ async fn template_script(id: Option<Path<String>>, title: &str) -> Html<String> 
     let template = ScriptTemplate {
         title,
         script: script_yaml.as_deref(),
+        json_schema: &json_schema_str,
+    };
+    Html(template.render().unwrap())
+}
+
+#[derive(Template)]
+#[template(path = "jobs.html")]
+struct JobsTemplate<'a> {
+    title: &'a str,
+    jobs: Vec<job::Job>,
+}
+
+#[derive(Template)]
+#[template(path = "job.html")]
+struct JobTemplate<'a> {
+    title: &'a str,
+    job: Option<&'a str>,
+    json_schema: &'a str,
+}
+
+async fn template_jobs() -> Html<String> {
+    let jobs = job::Job::get_all();
+    let template = JobsTemplate { title: "Jobs", jobs };
+    Html(template.render().unwrap())
+}
+
+async fn template_update_job(Path(id): Path<String>) -> Html<String> {
+    template_job(Some(axum::extract::Path(id)), "Jobs").await
+}
+
+async fn template_create_job() -> Html<String> {
+    template_job(None, "Create Job").await
+}
+
+async fn template_job(id: Option<Path<String>>, title: &str) -> Html<String> {
+    let job = if let Some(id) = id {
+        job::Job::get(id.as_str())
+    } else {
+        None
+    };
+
+    let mut job_yaml = None;
+    if let Some(job) = job.as_ref() {
+        job_yaml = Some(serde_yaml::to_string(job).unwrap());
+    }
+
+    let json_schema = job::Job::get_json_schema();
+    let json_schema_str = serde_json::to_string(&json_schema).unwrap();
+
+    let template = JobTemplate {
+        title,
+        job: job_yaml.as_deref(),
         json_schema: &json_schema_str,
     };
     Html(template.render().unwrap())

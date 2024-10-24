@@ -37,13 +37,13 @@ impl TriggerType {
     }
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, JsonSchema, Debug)]
 pub struct JobParameterDefinition {
     pub name: String,
     pub default: Option<ScriptParameterType>,
 }
 
-#[derive(Deserialize, Serialize, Default, Debug)]
+#[derive(Deserialize, Serialize, Default, JsonSchema, Debug)]
 pub struct Job {
     pub id: String,
     pub name: String,
@@ -379,6 +379,11 @@ impl Job {
         }
 
         Ok(job_result)
+    }
+
+    pub fn get_json_schema() -> Result<serde_json::Value, String> {
+        let schema = schema_for!(Job);
+        serde_json::to_value(schema).map_err(|e| e.to_string())
     }
 }
 

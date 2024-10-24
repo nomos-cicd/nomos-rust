@@ -2,10 +2,10 @@
 
 {% block body %}
 
-<form method="post" action="/api/scripts" onsubmit="submitString(event, '#script', 'application/yaml')">
+<form method="post" action="/api/jobs" onsubmit="submitString(event, '#job', 'application/yaml')">
     <fieldset class="uk-fieldset">
         <div id="code-container" style="width: 800px; height: 600px; border: 1px solid grey"></div>
-        <input type="hidden" id="script" name="script" value="">
+        <input type="hidden" id="job" name="job" value="">
 
         <div class="uk-margin">
             <button class="uk-button uk-button-primary">Submit</button>
@@ -20,7 +20,7 @@
         return txt.value;
     }
 
-    let value = `{% if script.is_some() %}{{ script.unwrap() }}{% else %}{% endif %}`;
+    let value = `{% if job.is_some() %}{{ job.unwrap() }}{% else %}{% endif %}`;
     value = decodeHtmlString(value).replace(/&quot;/g, '"');
 
     var editor = monaco.editor.create(document.getElementById('code-container'), {
@@ -29,9 +29,9 @@
         theme: 'vs-dark'
     });
 
-    document.querySelector('#script').value = value;
+    document.querySelector('#job').value = value;
     editor.onDidChangeModelContent(() => {
-        document.querySelector('#script').value = editor.getValue();
+        document.querySelector('#job').value = editor.getValue();
     });
 </script>
 

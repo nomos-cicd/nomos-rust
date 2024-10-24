@@ -1,0 +1,39 @@
+{% extends "fragment-base.html" %}
+
+{% block body %}
+<div class="max-w-6xl mx-auto p-6">
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="uk-table uk-table-middle uk-table-divider">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="uk-width-small px-6 py-3 text-left text-sm font-semibold text-gray-900">ID</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Parameters</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Triggers</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Script ID</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Read Only</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for job in jobs %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ job.id }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ job.name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ job.parameters.len() }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ job.triggers.len() }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ job.script_id }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ job.read_only }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <a href="/jobs/{{ job.id }}"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
