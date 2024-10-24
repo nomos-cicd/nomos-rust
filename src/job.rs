@@ -73,7 +73,7 @@ impl Default for JobResult {
         JobResult {
             id,
             job_id: String::new(),
-            is_success: true,
+            is_success: false,
             steps: vec![],
             current_step_name: None,
             started_at: Utc::now(),
@@ -211,15 +211,19 @@ impl JobResult {
         }
     }
 
-    pub fn delete(&self) {
-        let path = default_job_results_location().join(&self.id).join("result.yml");
-        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
-    }
-
     pub fn save(&self) {
         let path = default_job_results_location().join(&self.id).join("result.yml");
         let file = File::create(path).map_err(|e| e.to_string()).unwrap();
         serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
+    }
+
+    pub async fn wait_for_completion(id: &str) -> Result<Self, String> {
+        let mut job_result = JobResult::get(id).ok_or("Could not get job result")?;
+        while job_result.finished_at.is_none() {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            job_result = JobResult::get(id).ok_or("Could not get job result")?;
+        }
+        Ok(job_result)
     }
 }
 
@@ -344,8 +348,10 @@ impl Job {
         directory: PathBuf,
         parameters: &mut HashMap<String, ScriptParameterType>,
     ) -> Result<(), String> {
-        let _ = &job_result.start_step();
+        let mut is_success = true;
         while job_result.finished_at.is_none() {
+            let _ = &job_result.start_step();
+
             // Clone `current_step` to avoid immutable borrow on `job_result`
             let current_step = job_result.get_current_step_mut().unwrap().clone();
             let step_name = current_step.name.clone();
@@ -355,14 +361,19 @@ impl Job {
 
             if result.is_err() {
                 job_result.finish_step(false);
+                is_success = false;
                 break;
             }
             job_result.finish_step(true);
         }
 
+        job_result.is_success = is_success;
+        job_result.save();
+
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_json_schema() -> Result<serde_json::Value, String> {
         let schema = schema_for!(Job);
         serde_json::to_value(schema).map_err(|e| e.to_string())

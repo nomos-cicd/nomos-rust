@@ -49,6 +49,7 @@ pub enum ScriptType {
 }
 
 impl ScriptType {
+    #[allow(dead_code)]
     pub fn from_str(t: &str) -> Result<Self, String> {
         match t {
             "bash" => Ok(ScriptType::Bash(BashScript::default())),
@@ -157,6 +158,7 @@ impl Script {
         std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
     }
 
+    #[allow(dead_code)]
     pub fn get_json_schema() -> serde_json::Value {
         let schema = schema_for!(Script);
         serde_json::to_value(schema).unwrap()
@@ -184,7 +186,7 @@ impl Default for ScriptStep {
             values: vec![],
             is_started: false,
             is_finished: false,
-            is_success: true,
+            is_success: false,
             started_at: Utc::now(),
             finished_at: Utc::now(),
         }

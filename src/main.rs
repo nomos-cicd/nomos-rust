@@ -319,7 +319,7 @@ struct ScriptsTemplate<'a> {
 struct ScriptTemplate<'a> {
     title: &'a str,
     script: Option<&'a str>,
-    json_schema: &'a str,
+    // json_schema: &'a str,
 }
 
 async fn template_scripts() -> Html<String> {
@@ -351,13 +351,13 @@ async fn template_script(id: Option<Path<String>>, title: &str) -> Html<String> 
         script_yaml = Some(serde_yaml::to_string(script).unwrap());
     }
 
-    let json_schema = script::Script::get_json_schema();
-    let json_schema_str = serde_json::to_string(&json_schema).unwrap();
+    // let json_schema = script::Script::get_json_schema();
+    // let json_schema_str = serde_json::to_string(&json_schema).unwrap();
 
     let template = ScriptTemplate {
         title,
         script: script_yaml.as_deref(),
-        json_schema: &json_schema_str,
+        // json_schema: &json_schema_str,
     };
     Html(template.render().unwrap())
 }
@@ -374,7 +374,7 @@ struct JobsTemplate<'a> {
 struct JobTemplate<'a> {
     title: &'a str,
     job: Option<&'a str>,
-    json_schema: &'a str,
+    // json_schema: &'a str,
 }
 
 async fn template_jobs() -> Html<String> {
@@ -403,13 +403,13 @@ async fn template_job(id: Option<Path<String>>, title: &str) -> Html<String> {
         job_yaml = Some(serde_yaml::to_string(job).unwrap());
     }
 
-    let json_schema = job::Job::get_json_schema();
-    let json_schema_str = serde_json::to_string(&json_schema).unwrap();
+    // let json_schema = job::Job::get_json_schema();
+    // let json_schema_str = serde_json::to_string(&json_schema).unwrap();
 
     let template = JobTemplate {
         title,
         job: job_yaml.as_deref(),
-        json_schema: &json_schema_str,
+        // json_schema: &json_schema_str,
     };
     Html(template.render().unwrap())
 }
