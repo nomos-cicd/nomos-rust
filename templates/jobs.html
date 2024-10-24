@@ -29,6 +29,10 @@
                             <a href="/jobs/{{ job.id }}" class="uk-button uk-button-default uk-button-small">
                                 View
                             </a>
+                            <button onclick="runJob('{{ job.id }}')"
+                                class="uk-button uk-button-primary uk-button-small">
+                                Run
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -37,4 +41,22 @@
         </div>
     </div>
 </div>
+
+<script>
+    async function runJob(jobId) {
+        try {
+            const response = await fetch(`/api/jobs/${jobId}/execute`, {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            window.location.href = `/job-results/${(await response.text())}`;
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+</script>
 {% endblock %}

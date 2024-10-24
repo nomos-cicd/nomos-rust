@@ -67,8 +67,8 @@
     <div class="uk-card uk-card-default uk-card-body uk-margin">
         <h4 class="uk-card-title">Logs</h4>
         <div class="uk-height-medium uk-overflow-auto uk-background-muted uk-padding-small">
-            <div id="logs" hx-get="/job-results/{{ result.id }}/logs" hx-trigger="load, every 3s"
-                hx-swap="innerHTML">
+            <div id="logs" hx-get="/job-results/{{ result.id }}/logs"
+                hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML">
             </div>
         </div>
     </div>

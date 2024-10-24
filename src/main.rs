@@ -42,6 +42,7 @@ async fn main() {
         .route("/api/jobs/:id", routing::get(get_job))
         .route("/api/jobs", routing::post(create_job))
         .route("/api/jobs/:id", routing::delete(delete_job))
+        .route("/api/jobs/:id/execute", routing::post(execute_job))
         .route("/api/job-trigger-types", routing::get(get_job_trigger_types))
         .route("/api/job-results", routing::get(get_job_results))
         .route("/api/job-results/:id", routing::get(get_job_result))
@@ -181,6 +182,22 @@ async fn delete_job(Path(id): Path<String>) -> StatusCode {
     }
     job.unwrap().delete();
     StatusCode::NO_CONTENT
+}
+
+async fn execute_job(
+    Path(id): Path<String>,
+    /*Json(parameters): Json<HashMap<String, ScriptParameterType>>,*/
+) -> (StatusCode, String) {
+    let job = job::Job::get(id.as_str());
+    if job.is_none() {
+        return (StatusCode::NOT_FOUND, "".to_string());
+    }
+    let result = job.unwrap().execute(Default::default());
+    if result.is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "".to_string());
+    }
+
+    (StatusCode::OK, result.unwrap())
 }
 
 async fn get_job_trigger_types() -> Json<serde_json::Value> {

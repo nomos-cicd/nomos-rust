@@ -197,6 +197,7 @@ impl JobResult {
                 JobResult::try_from(path.clone()).map_err(|e| format!("Path: {:?}, Error: {:?}", path, e))?;
             job_results.push(job_result);
         }
+        job_results.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         Ok(job_results)
     }
 
@@ -289,7 +290,7 @@ impl Job {
         std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
     }
 
-    pub fn execute(&self, parameters: HashMap<String, ScriptParameterType>) -> Result<JobResult, String> {
+    pub fn execute(&self, parameters: HashMap<String, ScriptParameterType>) -> Result<String, String> {
         let script = Script::get(&self.script_id).ok_or("Could not get script")?;
         self.execute_with_script(parameters, &script)
     }
@@ -298,7 +299,7 @@ impl Job {
         &self,
         parameters: HashMap<String, ScriptParameterType>,
         script: &Script,
-    ) -> Result<JobResult, String> {
+    ) -> Result<String, String> {
         let mut merged_parameters = parameters.clone();
         for parameter in &self.parameters {
             if !parameters.contains_key(&parameter.name) {
@@ -325,9 +326,24 @@ impl Job {
         }
 
         let mut job_result = JobResult::from((self, script));
+        let id = job_result.id.clone();
         let directory = default_job_results_location().join(&job_result.id);
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        job_result.save();
 
+        tokio::spawn(async move {
+            let _ = Job::execute_job_result(&mut job_result, directory, &mut merged_parameters_with_prefix).await;
+        });
+
+        Ok(id)
+    }
+
+    /// parameters should be prepared by the caller
+    pub async fn execute_job_result(
+        job_result: &mut JobResult,
+        directory: PathBuf,
+        parameters: &mut HashMap<String, ScriptParameterType>,
+    ) -> Result<(), String> {
         let _ = &job_result.start_step();
         while job_result.finished_at.is_none() {
             // Clone `current_step` to avoid immutable borrow on `job_result`
@@ -335,12 +351,7 @@ impl Job {
             let step_name = current_step.name.clone();
 
             // Mutable borrow of `job_result` is now safe
-            let result = current_step.execute(
-                &mut merged_parameters_with_prefix,
-                directory.clone(),
-                step_name.as_str(),
-                &mut job_result,
-            );
+            let result = current_step.execute(parameters, directory.clone(), step_name.as_str(), job_result);
 
             if result.is_err() {
                 job_result.finish_step(false);
@@ -349,7 +360,7 @@ impl Job {
             job_result.finish_step(true);
         }
 
-        Ok(job_result)
+        Ok(())
     }
 
     pub fn get_json_schema() -> Result<serde_json::Value, String> {
