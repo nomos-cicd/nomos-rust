@@ -1,16 +1,12 @@
 use std::{
-    io::{BufRead, BufReader},
+    io::{BufReader, Read},
     path::PathBuf,
     process::{Child, Command, Stdio},
 };
 
 use crate::{job::JobResult, log::LogLevel};
 
-pub fn execute_command(
-    command: &str,
-    directory: PathBuf,
-    job_result: &mut JobResult,
-) -> Result<(), String> {
+pub fn execute_command(command: &str, directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
         cmd.args(["/C", command]);
@@ -67,20 +63,22 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
 
-    let stdout_reader = BufReader::new(stdout);
-    let stderr_reader = BufReader::new(stderr);
+    let mut stdout_reader = BufReader::new(stdout);
+    let mut stderr_reader = BufReader::new(stderr);
 
-    // Log stdout in real-time
-    for line in stdout_reader.lines() {
-        if let Ok(line) = line {
-            job_result.add_log(LogLevel::Info, line.clone());
+    // Read entire stdout
+    let mut stdout_content = String::new();
+    if let Ok(_) = stdout_reader.read_to_string(&mut stdout_content) {
+        if !stdout_content.is_empty() {
+            job_result.add_log(LogLevel::Info, stdout_content);
         }
     }
 
-    // Log stderr in real-time
-    for line in stderr_reader.lines() {
-        if let Ok(line) = line {
-            job_result.add_log(LogLevel::Error, line.clone());
+    // Read entire stderr
+    let mut stderr_content = String::new();
+    if let Ok(_) = stderr_reader.read_to_string(&mut stderr_content) {
+        if !stderr_content.is_empty() {
+            job_result.add_log(LogLevel::Error, stderr_content);
         }
     }
 

@@ -40,6 +40,7 @@
     <script type="module" src="https://unpkg.com/franken-ui/dist/js/core.iife.js"></script>
     <script type="module" src="https://unpkg.com/franken-ui/dist/js/icon.iife.js"></script>
     <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/sse.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.js"></script>
     <script>var require = { paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' } };</script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
@@ -52,7 +53,7 @@
             <div class="uk-navbar-left">
                 <ul class="uk-navbar-nav">
                     <li class='{% if title == "Job Results" %}uk-active{% endif %}'>
-                        <a href="#">Job Results</a>
+                        <a href="/job-results">Job Results</a>
                     </li>
                     <li>
                         <a href="#" class='{% if title == "Jobs" || title == "Create Job" %}uk-active{% endif %}'>

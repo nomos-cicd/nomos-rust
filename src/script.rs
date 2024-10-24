@@ -59,7 +59,6 @@ impl ScriptType {
     }
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(tag = "type", content = "value")]
 pub enum ScriptParameterType {
@@ -114,16 +113,16 @@ impl Script {
         }
     }
 
-    pub fn get_all() -> Vec<Self> {
+    pub fn get_all() -> Result<Vec<Self>, String> {
         let scripts_path = default_scripts_location();
         let mut scripts = vec![];
-        for entry in std::fs::read_dir(scripts_path).unwrap() {
-            let entry = entry.unwrap();
+        for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let script = Script::try_from(path).unwrap();
+            let script = Script::try_from(path)?;
             scripts.push(script);
         }
-        scripts
+        Ok(scripts)
     }
 
     /// Save as YamlScript. Primarily used after creating a new script.
@@ -137,10 +136,7 @@ impl Script {
                     job_result.add_log(log::LogLevel::Info, format!("Updated script {:?}", self.id))
                 }
             } else if let Some(job_result) = job_result {
-                job_result.add_log(
-                    log::LogLevel::Info,
-                    format!("No changes in script {:?}", self.id),
-                )
+                job_result.add_log(log::LogLevel::Info, format!("No changes in script {:?}", self.id))
             }
         } else {
             self.save();
@@ -153,16 +149,12 @@ impl Script {
     fn save(&self) {
         let path = default_scripts_location().join(format!("{}.yml", self.id));
         let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, self)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
     }
 
     pub fn delete(&self) {
         let path = default_scripts_location().join(format!("{}.yml", self.id));
-        std::fs::remove_file(path)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
     }
 
     pub fn get_json_schema() -> serde_json::Value {
@@ -302,9 +294,7 @@ impl ScriptExecutor for GitCloneScript {
         }
 
         let mut branch = self.branch.clone();
-        let is_variable = branch
-            .as_ref()
-            .map_or(false, |b| b.starts_with("$parameters."));
+        let is_variable = branch.as_ref().map_or(false, |b| b.starts_with("$parameters."));
         if is_variable {
             let p = parameters.get(branch.as_ref().unwrap()).cloned();
             match p {
@@ -385,9 +375,7 @@ impl ScriptExecutor for ScriptType {
     ) -> Result<(), String> {
         match self {
             ScriptType::Bash(bash) => bash.execute(parameters, directory, step_name, job_result),
-            ScriptType::GitClone(git_clone) => {
-                git_clone.execute(parameters, directory, step_name, job_result)
-            }
+            ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory, step_name, job_result),
             ScriptType::Sync(sync) => sync.execute(parameters, directory, step_name, job_result),
         }
     }
@@ -428,8 +416,6 @@ pub fn default_scripts_location() -> PathBuf {
     } else {
         PathBuf::from("/var/lib/nomos/scripts")
     };
-    std::fs::create_dir_all(&path)
-        .map_err(|e| e.to_string())
-        .unwrap();
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string()).unwrap();
     path
 }

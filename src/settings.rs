@@ -20,10 +20,7 @@ impl Settings {
         for yaml_credential in &self.credentials {
             let credential = Credential::try_from(yaml_credential);
             if let Err(e) = credential {
-                job_result.add_log(
-                    log::LogLevel::Error,
-                    format!("Error syncing credential: {:?}", e),
-                );
+                job_result.add_log(log::LogLevel::Error, format!("Error syncing credential: {:?}", e));
                 continue;
             }
 
@@ -31,7 +28,7 @@ impl Settings {
             credential_ids.push(yaml_credential.id.clone());
         }
 
-        let credentials = Credential::get_all();
+        let credentials = Credential::get_all().unwrap();
         for credential in credentials {
             if !credential_ids.contains(&credential.id) && !credential.read_only {
                 credential.delete();
@@ -45,8 +42,7 @@ impl TryFrom<PathBuf> for Settings {
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
         let yaml_str = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let settings: Settings =
-            serde_yaml::from_str(yaml_str.as_str()).map_err(|e| e.to_string())?;
+        let settings: Settings = serde_yaml::from_str(yaml_str.as_str()).map_err(|e| e.to_string())?;
         Ok(settings)
     }
 }
@@ -65,14 +61,11 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         script.sync(job_result.into());
         script_ids.push(script.id.clone());
     }
-    let scripts = Script::get_all();
+    let scripts = Script::get_all().unwrap();
     for script in scripts {
         if !script_ids.contains(&script.id) {
             script.delete();
-            job_result.add_log(
-                log::LogLevel::Info,
-                format!("Deleted script {:?}", script.id),
-            );
+            job_result.add_log(log::LogLevel::Info, format!("Deleted script {:?}", script.id));
         }
     }
 
@@ -85,7 +78,7 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         job.sync(job_result.into());
         job_ids.push(job.id.clone());
     }
-    let jobs = Job::get_all();
+    let jobs = Job::get_all().unwrap();
     for job in jobs {
         if !job_ids.contains(&job.id) && !job.read_only {
             job.delete();

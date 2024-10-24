@@ -60,9 +60,7 @@ impl Default for Credential {
     fn default() -> Self {
         Credential {
             id: String::new(),
-            value: CredentialType::Text(TextCredentialParameter {
-                value: String::new(),
-            }),
+            value: CredentialType::Text(TextCredentialParameter { value: String::new() }),
             read_only: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -74,29 +72,23 @@ impl Credential {
     pub fn get(credential_id: &str) -> Option<Self> {
         let path = default_credentials_location().join(format!("{}.yml", credential_id));
         if path.exists() {
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| e.to_string())
-                .unwrap();
-            serde_yaml::from_str(&content)
-                .map_err(|e| e.to_string())
-                .ok()
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string()).unwrap();
+            serde_yaml::from_str(&content).map_err(|e| e.to_string()).ok()
         } else {
             None
         }
     }
 
-    pub fn get_all() -> Vec<Self> {
+    pub fn get_all() -> Result<Vec<Self>, String> {
         let path = default_credentials_location();
         let mut credentials = Vec::new();
-        for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
-            let entry = entry.map_err(|e| e.to_string()).unwrap();
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let credential = Credential::try_from(path)
-                .map_err(|e| e.to_string())
-                .unwrap();
+            let credential = Credential::try_from(path).map_err(|e| e.to_string())?;
             credentials.push(credential);
         }
-        credentials
+        Ok(credentials)
     }
 
     pub fn get_credential_type(&self) -> &str {
@@ -112,44 +104,29 @@ impl Credential {
             if existing_credential != *self {
                 self.save();
                 if let Some(job_result) = job_result {
-                    job_result.add_log(
-                        log::LogLevel::Info,
-                        format!("Updated credential {:?}", self.id),
-                    )
+                    job_result.add_log(log::LogLevel::Info, format!("Updated credential {:?}", self.id))
                 }
             } else if let Some(job_result) = job_result {
-                job_result.add_log(
-                    log::LogLevel::Info,
-                    format!("No changes in credential {:?}", self.id),
-                )
+                job_result.add_log(log::LogLevel::Info, format!("No changes in credential {:?}", self.id))
             }
         } else {
             self.save();
             if let Some(job_result) = job_result {
-                job_result.add_log(
-                    log::LogLevel::Info,
-                    format!("Created credential {:?}", self.id),
-                )
+                job_result.add_log(log::LogLevel::Info, format!("Created credential {:?}", self.id))
             }
         }
     }
 
     fn save(&self) {
         let path = default_credentials_location().join(format!("{}.yml", self.id));
-        let file = std::fs::File::create(path)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        let file = std::fs::File::create(path).map_err(|e| e.to_string()).unwrap();
         let writer = std::io::BufWriter::new(file);
-        serde_yaml::to_writer(writer, self)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        serde_yaml::to_writer(writer, self).map_err(|e| e.to_string()).unwrap();
     }
 
     pub fn delete(&self) {
         let path = default_credentials_location().join(format!("{}.yml", self.id));
-        std::fs::remove_file(path)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
     }
 }
 
@@ -194,8 +171,7 @@ impl TryFrom<PathBuf> for YamlCredential {
         let reader = std::io::BufReader::new(file);
         let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
 
-        let yaml_credential: YamlCredential =
-            serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
+        let yaml_credential: YamlCredential = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
 
         Ok(yaml_credential)
     }
@@ -217,8 +193,6 @@ pub fn default_credentials_location() -> PathBuf {
     } else {
         PathBuf::from("/var/lib/nomos/credentials")
     };
-    std::fs::create_dir_all(&path)
-        .map_err(|e| e.to_string())
-        .unwrap();
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string()).unwrap();
     path
 }

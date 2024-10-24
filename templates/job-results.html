@@ -1,0 +1,50 @@
+{% extends "fragment-base.html" %}
+
+{% block body %}
+<div class="uk-container uk-container-large uk-margin">
+    <div class="uk-card uk-card-default">
+        <div class="uk-overflow-auto">
+            <table class="uk-table uk-table-middle uk-table-divider uk-table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Job</th>
+                        <th>Status</th>
+                        <th>Started At</th>
+                        <th>Updated At</th>
+                        <th>Finished At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                    <tr>
+                        <td>{{ result.id }}</td>
+                        <td>{{ result.job_id }}</td>
+                        <td>
+                            {% if result.finished_at.is_some() %}
+                            {% if result.is_success %}
+                            <span class="uk-label uk-label-success">Success</span>
+                            {% else %}
+                            <span class="uk-label uk-label-danger">Failed</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="uk-label">In Progress</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ result.started_at }}</td>
+                        <td>{{ result.updated_at }}</td>
+                        <td>{% if result.finished_at.is_some() %}{{ result.finished_at.unwrap() }}{% endif %}</td>
+                        <td>
+                            <a href="/job-results/{{ result.id }}" class="uk-button uk-button-default uk-button-small">
+                                View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

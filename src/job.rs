@@ -125,9 +125,7 @@ impl From<(&Job, &Script)> for JobResult {
 impl JobResult {
     pub fn get_current_step_mut(&mut self) -> Option<&mut ScriptStep> {
         if let Some(ref current_step_name) = self.current_step_name {
-            self.steps
-                .iter_mut()
-                .find(|step| step.name == *current_step_name)
+            self.steps.iter_mut().find(|step| step.name == *current_step_name)
         } else {
             None
         }
@@ -164,14 +162,10 @@ impl JobResult {
                 return;
             }
 
-            let index = self
-                .steps
-                .iter()
-                .position(|step| step.name == current_step_name);
+            let index = self.steps.iter().position(|step| step.name == current_step_name);
             if let Some(index) = index {
                 if index + 1 < self.steps.len() {
-                    self.current_step_name =
-                        self.steps.get(index + 1).cloned().map(|step| step.name);
+                    self.current_step_name = self.steps.get(index + 1).cloned().map(|step| step.name);
                     self.updated_at = now;
                 } else {
                     let now: DateTime<Utc> = Utc::now();
@@ -192,51 +186,39 @@ impl JobResult {
         }
     }
 
-    pub fn get_all() -> Vec<Self> {
+    pub fn get_all() -> Result<Vec<Self>, String> {
         let path = default_job_results_location();
         let mut job_results = Vec::new();
         for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
             let entry = entry.map_err(|e| e.to_string()).unwrap();
-            let path = entry.path();
-            let job_result = JobResult::try_from(path)
-                .map_err(|e| e.to_string())
-                .unwrap();
+            let mut path = entry.path();
+            path.push("result.yml");
+            let job_result =
+                JobResult::try_from(path.clone()).map_err(|e| format!("Path: {:?}, Error: {:?}", path, e))?;
             job_results.push(job_result);
         }
-        job_results
+        Ok(job_results)
     }
 
     pub fn get(id: &str) -> Option<Self> {
-        let path = default_job_results_location().join(id);
+        let path = default_job_results_location().join(id).join("result.yml");
         if path.exists() {
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| e.to_string())
-                .ok()?;
-            serde_yaml::from_str(&content)
-                .map_err(|e| e.to_string())
-                .ok()
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string()).ok()?;
+            serde_yaml::from_str(&content).map_err(|e| e.to_string()).ok()
         } else {
             None
         }
     }
 
     pub fn delete(&self) {
-        let path = default_job_results_location()
-            .join(&self.id)
-            .join("result.yml");
-        std::fs::remove_file(path)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        let path = default_job_results_location().join(&self.id).join("result.yml");
+        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
     }
 
     pub fn save(&self) {
-        let path = default_job_results_location()
-            .join(&self.id)
-            .join("result.yml");
+        let path = default_job_results_location().join(&self.id).join("result.yml");
         let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, self)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
     }
 }
 
@@ -254,27 +236,23 @@ impl Job {
     pub fn get(id: &str) -> Option<Self> {
         let path = default_jobs_location().join(format!("{}.yml", id));
         if path.exists() {
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| e.to_string())
-                .ok()?;
-            serde_yaml::from_str(&content)
-                .map_err(|e| e.to_string())
-                .ok()
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string()).ok()?;
+            serde_yaml::from_str(&content).map_err(|e| e.to_string()).ok()
         } else {
             None
         }
     }
 
-    pub fn get_all() -> Vec<Self> {
+    pub fn get_all() -> Result<Vec<Self>, String> {
         let path = default_jobs_location();
         let mut jobs = Vec::new();
-        for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
-            let entry = entry.map_err(|e| e.to_string()).unwrap();
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let job = Job::try_from(path).map_err(|e| e.to_string()).unwrap();
+            let job = Job::try_from(path).map_err(|e| e.to_string())?;
             jobs.push(job);
         }
-        jobs
+        Ok(jobs)
     }
 
     pub fn sync(&self, job_result: Option<&mut JobResult>) {
@@ -303,22 +281,15 @@ impl Job {
     fn save(&self) {
         let path = default_jobs_location().join(format!("{}.yml", self.id));
         let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, self)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
     }
 
     pub fn delete(&self) {
         let path = PathBuf::from("jobs").join(format!("{}.yml", self.id));
-        std::fs::remove_file(path)
-            .map_err(|e| e.to_string())
-            .unwrap();
+        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
     }
 
-    pub fn execute(
-        &self,
-        parameters: HashMap<String, ScriptParameterType>,
-    ) -> Result<JobResult, String> {
+    pub fn execute(&self, parameters: HashMap<String, ScriptParameterType>) -> Result<JobResult, String> {
         let script = Script::get(&self.script_id).ok_or("Could not get script")?;
         self.execute_with_script(parameters, &script)
     }
@@ -394,9 +365,7 @@ pub fn default_job_results_location() -> PathBuf {
     } else {
         PathBuf::from("/var/lib/nomos/job_results")
     };
-    std::fs::create_dir_all(&path)
-        .map_err(|e| e.to_string())
-        .unwrap();
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string()).unwrap();
     path
 }
 
@@ -407,8 +376,6 @@ pub fn default_jobs_location() -> PathBuf {
     } else {
         PathBuf::from("/var/lib/nomos/jobs")
     };
-    std::fs::create_dir_all(&path)
-        .map_err(|e| e.to_string())
-        .unwrap();
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string()).unwrap();
     path
 }

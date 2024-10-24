@@ -13,7 +13,10 @@ use axum::{
     response::Html,
     routing, Json, Router,
 };
+use chrono::{DateTime, Utc};
 use credential::{Credential, CredentialType, YamlCredential};
+use job::JobResult;
+use log::LogLevel;
 use script::Script;
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
@@ -53,6 +56,9 @@ async fn main() {
         .route("/jobs", routing::get(template_jobs))
         .route("/jobs/create", routing::get(template_create_job))
         .route("/jobs/:id", routing::get(template_update_job))
+        .route("/job-results", routing::get(template_job_results))
+        .route("/job-results/:id", routing::get(template_job_result))
+        .route("/job-results/:id/logs", routing::get(template_job_result_logs))
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
@@ -61,7 +67,7 @@ async fn main() {
 }
 
 async fn get_credentials() -> Json<Vec<credential::Credential>> {
-    let credentials = credential::Credential::get_all();
+    let credentials = credential::Credential::get_all().unwrap();
     Json(credentials)
 }
 
@@ -95,7 +101,7 @@ async fn get_credential_types() -> Json<serde_json::Value> {
 }
 
 async fn get_scripts() -> Json<Vec<script::Script>> {
-    let scripts = script::Script::get_all();
+    let scripts = script::Script::get_all().unwrap();
     Json(scripts)
 }
 
@@ -139,7 +145,7 @@ async fn get_script_parameter_types() -> Json<serde_json::Value> {
 }
 
 async fn get_jobs() -> Json<Vec<job::Job>> {
-    let jobs = job::Job::get_all();
+    let jobs = job::Job::get_all().unwrap();
     Json(jobs)
 }
 
@@ -183,7 +189,7 @@ async fn get_job_trigger_types() -> Json<serde_json::Value> {
 }
 
 async fn get_job_results() -> Json<Vec<job::JobResult>> {
-    let job_results = job::JobResult::get_all();
+    let job_results = job::JobResult::get_all().unwrap();
     Json(job_results)
 }
 
@@ -200,7 +206,7 @@ struct CredentialsTemplate<'a> {
 }
 
 async fn template_credentials() -> Html<String> {
-    let credentials = Credential::get_all();
+    let credentials = Credential::get_all().unwrap();
     let template = CredentialsTemplate {
         title: "Credentials",
         credentials,
@@ -300,7 +306,7 @@ struct ScriptTemplate<'a> {
 }
 
 async fn template_scripts() -> Html<String> {
-    let scripts = Script::get_all();
+    let scripts = Script::get_all().unwrap();
     let template = ScriptsTemplate {
         title: "Scripts",
         scripts,
@@ -355,7 +361,7 @@ struct JobTemplate<'a> {
 }
 
 async fn template_jobs() -> Html<String> {
-    let jobs = job::Job::get_all();
+    let jobs = job::Job::get_all().unwrap();
     let template = JobsTemplate { title: "Jobs", jobs };
     Html(template.render().unwrap())
 }
@@ -388,5 +394,69 @@ async fn template_job(id: Option<Path<String>>, title: &str) -> Html<String> {
         job: job_yaml.as_deref(),
         json_schema: &json_schema_str,
     };
+    Html(template.render().unwrap())
+}
+
+#[derive(Template)]
+#[template(path = "job-results.html")]
+struct JobResultsTemplate<'a> {
+    title: &'a str,
+    results: Vec<JobResult>,
+}
+
+#[derive(Template)]
+#[template(path = "job-result.html")]
+struct JobResultTemplate<'a> {
+    title: &'a str,
+    result: &'a JobResult,
+    now: DateTime<Utc>,
+}
+
+#[derive(Template)]
+#[template(path = "job-result-logs.html")]
+struct JobResultLogsTemplate<'a> {
+    logs: Vec<FormattedLog<'a>>,
+}
+
+struct FormattedLog<'a> {
+    timestamp: &'a DateTime<Utc>,
+    level: &'a LogLevel,
+    message: &'a str,
+}
+
+async fn template_job_results() -> Html<String> {
+    let results = JobResult::get_all().unwrap();
+    let template = JobResultsTemplate {
+        title: "Job Results",
+        results,
+    };
+    Html(template.render().unwrap())
+}
+
+async fn template_job_result(Path(id): Path<String>) -> Html<String> {
+    let result = JobResult::get(&id).unwrap();
+    let now = Utc::now();
+    let template = JobResultTemplate {
+        title: "Job Result",
+        result: &result,
+        now,
+    };
+    Html(template.render().unwrap())
+}
+
+async fn template_job_result_logs(Path(result_id): Path<String>) -> Html<String> {
+    let result = JobResult::get(&result_id).unwrap();
+    let logs = result.logger.get_logs().unwrap();
+
+    let formatted_logs: Vec<FormattedLog> = logs
+        .iter()
+        .map(|log| FormattedLog {
+            timestamp: &log.timestamp,
+            level: &log.level,
+            message: &log.message,
+        })
+        .collect();
+
+    let template = JobResultLogsTemplate { logs: formatted_logs };
     Html(template.render().unwrap())
 }

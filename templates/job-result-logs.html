@@ -1,0 +1,16 @@
+<div class="uk-margin-small-bottom">
+    {% for log in logs %}
+    <div class="uk-margin-small-bottom">
+        <span class="uk-text-muted">{{ log.timestamp.format("%Y-%m-%d %H:%M:%S") }}</span>
+        <span class="uk-label uk-margin-small-left uk-margin-small-right
+            {% match log.level %}
+            {% when LogLevel::Info %}uk-label-primary
+            {% when LogLevel::Warning %}uk-label-warning
+            {% when LogLevel::Error %}uk-label-danger
+            {% endmatch %}">
+            {{ log.level }}
+        </span>
+        <span>{{ log.message }}</span>
+    </div>
+    {% endfor %}
+</div>

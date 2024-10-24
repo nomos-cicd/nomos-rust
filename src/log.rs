@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
@@ -9,6 +10,16 @@ pub enum LogLevel {
     Info,
     Warning,
     Error,
+}
+
+impl Display for LogLevel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogLevel::Info => write!(f, "INFO"),
+            LogLevel::Warning => write!(f, "WARNING"),
+            LogLevel::Error => write!(f, "ERROR"),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -61,12 +72,7 @@ impl JobLogger {
             .open(&self.log_filename)
             .map_err(|e| e.to_string())?;
 
-        writeln!(
-            file,
-            "{}",
-            serde_json::to_string(&log).map_err(|e| e.to_string())?
-        )
-        .map_err(|e| e.to_string())?;
+        writeln!(file, "{}", serde_json::to_string(&log).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
         Ok(())
     }
