@@ -29,7 +29,7 @@ pub fn docker_build(
 }
 
 /// docker stop {container} && docker rm {container}
-pub fn docker_stop_and_rm(container: &str, directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
-    execute_command(&format!("docker stop {}", container), directory.clone(), job_result)?;
-    execute_command(&format!("docker rm {}", container), directory, job_result)
+pub fn docker_stop_and_rm(container: &str, directory: PathBuf, job_result: &mut JobResult) {
+    let _ = execute_command(&format!("docker stop {}", container), directory.clone(), job_result);
+    let _ = execute_command(&format!("docker rm {}", container), directory, job_result);
 }

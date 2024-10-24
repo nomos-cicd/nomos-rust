@@ -42,6 +42,7 @@ impl ScriptExecutor for ScriptType {
             ScriptType::GitClone(git_clone) => git_clone.execute(parameters, directory, step_name, job_result),
             ScriptType::Sync(sync) => sync.execute(parameters, directory, step_name, job_result),
             ScriptType::DockerBuild(docker_build) => docker_build.execute(parameters, directory, step_name, job_result),
+            ScriptType::DockerStop(docker_stop) => docker_stop.execute(parameters, directory, step_name, job_result),
         }
     }
 }

@@ -24,3 +24,7 @@ steps:
       - type: docker-build
         image: $(parameters.docker_image)
         dockerfile: $(steps.Clone.git-clone.directory)/$(parameters.docker_dockerfile)
+  - name: Stop
+    values:
+      - type: docker-stop
+        container: $(parameters.docker_image)

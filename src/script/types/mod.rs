@@ -1,7 +1,7 @@
 pub mod bash;
+pub mod docker;
 pub mod git;
 pub mod sync;
-pub mod docker;
 
 pub use bash::BashScript;
 pub use git::GitCloneScript;
@@ -20,6 +20,8 @@ pub enum ScriptType {
     Sync(SyncScript),
     #[serde(rename = "docker-build")]
     DockerBuild(docker::DockerBuildScript),
+    #[serde(rename = "docker-stop")]
+    DockerStop(docker::DockerStopScript),
 }
 
 impl ScriptType {
@@ -30,6 +32,7 @@ impl ScriptType {
             "git-clone" => Ok(ScriptType::GitClone(GitCloneScript::default())),
             "sync" => Ok(ScriptType::Sync(SyncScript::default())),
             "docker-build" => Ok(ScriptType::DockerBuild(docker::DockerBuildScript::default())),
+            "docker-stop" => Ok(ScriptType::DockerStop(docker::DockerStopScript::default())),
             _ => Err(format!("Unknown script type: {}", t)),
         }
     }

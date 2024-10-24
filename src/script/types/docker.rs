@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    docker::docker_build,
+    docker::{docker_build, docker_stop_and_rm},
     job::JobResult,
     script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
 };
@@ -59,5 +59,29 @@ impl ScriptExecutor for DockerBuildScript {
         }
 
         docker_build(&image, dockerfile_path, directory, job_result)
+    }
+}
+
+/// Stops and removes a docker container. Ignoring errors.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+pub struct DockerStopScript {
+    pub container: String,
+}
+
+impl ScriptExecutor for DockerStopScript {
+    fn execute(
+        &self,
+        parameters: &mut HashMap<String, ScriptParameterType>,
+        directory: PathBuf,
+        _step_name: &str,
+        job_result: &mut JobResult,
+    ) -> Result<(), String> {
+        // Get container name with parameter substitution
+        let container = self.container
+            .substitute_parameters(parameters, false)?
+            .ok_or("Container name is required")?;
+
+        docker_stop_and_rm(&container, directory, job_result);
+        Ok(())
     }
 }
