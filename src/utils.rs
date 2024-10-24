@@ -68,18 +68,14 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
 
     // Read entire stdout
     let mut stdout_content = String::new();
-    if let Ok(_) = stdout_reader.read_to_string(&mut stdout_content) {
-        if !stdout_content.is_empty() {
-            job_result.add_log(LogLevel::Info, stdout_content);
-        }
+    if stdout_reader.read_to_string(&mut stdout_content).is_ok() && !stdout_content.is_empty() {
+        job_result.add_log(LogLevel::Info, stdout_content);
     }
 
     // Read entire stderr
     let mut stderr_content = String::new();
-    if let Ok(_) = stderr_reader.read_to_string(&mut stderr_content) {
-        if !stderr_content.is_empty() {
-            job_result.add_log(LogLevel::Error, stderr_content);
-        }
+    if stderr_reader.read_to_string(&mut stderr_content).is_ok() && !stderr_content.is_empty() {
+        job_result.add_log(LogLevel::Error, stderr_content);
     }
 
     let status = child.wait().map_err(|e| e.to_string())?;
