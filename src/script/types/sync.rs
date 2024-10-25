@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     job::JobResult,
-    script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
+    script::{
+        utils::{ParameterSubstitution, SubstitutionResult},
+        ScriptExecutor, ScriptParameterType,
+    },
     settings,
 };
 
@@ -28,6 +31,12 @@ impl ScriptExecutor for SyncScript {
             .directory
             .substitute_parameters(parameters, false)?
             .ok_or("Directory is required")?;
+        let param_directory_str = match param_directory_str {
+            SubstitutionResult::Single(s) => s,
+            SubstitutionResult::Multiple(_) => {
+                return Err("Directory parameter cannot be an array".to_string());
+            }
+        };
 
         let mut param_directory = PathBuf::from(param_directory_str);
 

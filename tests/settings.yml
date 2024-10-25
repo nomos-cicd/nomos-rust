@@ -12,9 +12,9 @@ credentials:
       value: val
   - id: test-credential
     value:
-      type: text
+      type: env
       value: |
-        env1
-        env2
-        env3
+        env1=val1
+        env2=val2
+        env3=val3
     read_only: false

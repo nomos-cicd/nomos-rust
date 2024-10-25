@@ -17,6 +17,12 @@ pub struct SshCredentialParameter {
     pub private_key: String,
 }
 
+/// Similar to node.js's `.env` file.
+#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Default, Debug)]
+pub struct EnvCredentialParameter {
+    pub value: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 #[serde(tag = "type")]
 pub enum CredentialType {
@@ -24,6 +30,8 @@ pub enum CredentialType {
     Text(TextCredentialParameter),
     #[serde(rename = "ssh")]
     Ssh(SshCredentialParameter),
+    #[serde(rename = "env")]
+    Env(EnvCredentialParameter),
 }
 
 impl CredentialType {
@@ -95,6 +103,7 @@ impl Credential {
         match self.value {
             CredentialType::Text(_) => "text",
             CredentialType::Ssh(_) => "ssh",
+            CredentialType::Env(_) => "env",
         }
     }
 

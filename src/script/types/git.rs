@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     git::git_clone,
     job::JobResult,
-    script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
+    script::{
+        utils::{ParameterSubstitution, SubstitutionResult},
+        ScriptExecutor, ScriptParameterType,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
@@ -25,17 +28,46 @@ impl ScriptExecutor for GitCloneScript {
         job_result: &mut JobResult,
     ) -> Result<(), String> {
         // Substitute parameters
-        let url = self.url.substitute_parameters(parameters, false)?.ok_or("URL is required")?;
+        let url = self
+            .url
+            .substitute_parameters(parameters, false)?
+            .ok_or("URL is required")?;
+        let url = match url {
+            SubstitutionResult::Single(s) => s,
+            SubstitutionResult::Multiple(_) => {
+                return Err("URL parameter cannot be an array".to_string());
+            }
+        };
 
         let credential_id = match &self.credential_id {
             Some(id) => id.substitute_parameters(parameters, true)?,
             None => None,
         };
+        let credential_id = match credential_id {
+            Some(id) => {
+                let id = match id {
+                    SubstitutionResult::Single(s) => Some(s),
+                    SubstitutionResult::Multiple(_) => {
+                        return Err("Credential ID parameter cannot be an array".to_string());
+                    }
+                };
+                id
+            }
+            None => None,
+        };
 
-        let branch = match &self.branch {
+        let branch: String = match &self.branch {
             Some(b) => {
-                let res = b.substitute_parameters(parameters, false)?;
-                res.unwrap_or_else(|| "main".to_string())
+                let branch = b.substitute_parameters(parameters, false)?;
+                match branch {
+                    Some(b) => match b {
+                        SubstitutionResult::Single(s) => s,
+                        SubstitutionResult::Multiple(_) => {
+                            return Err("Branch parameter cannot be an array".to_string());
+                        }
+                    },
+                    None => "main".to_string(),
+                }
             }
             None => "main".to_string(),
         };

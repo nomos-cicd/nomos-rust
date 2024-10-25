@@ -4,9 +4,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    credential::{Credential, CredentialType},
     docker::{docker_build, docker_run, docker_stop_and_rm},
     job::JobResult,
-    script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
+    script::{
+        utils::{ParameterSubstitution, SubstitutionResult},
+        ScriptExecutor, ScriptParameterType,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
@@ -28,12 +32,26 @@ impl ScriptExecutor for DockerBuildScript {
             .image
             .substitute_parameters(parameters, false)?
             .ok_or("Image name is required")?;
+        let image = match image {
+            SubstitutionResult::Single(s) => s,
+            SubstitutionResult::Multiple(_) => {
+                return Err("Image name parameter cannot be an array".to_string());
+            }
+        };
 
         // Get dockerfile path with parameter substitution
         let dockerfile = match &self.dockerfile {
-            Some(dockerfile) => dockerfile
-                .substitute_parameters(parameters, true)?
-                .unwrap_or_else(|| "Dockerfile".to_string()),
+            Some(dockerfile) => {
+                match dockerfile
+                    .substitute_parameters(parameters, false)?
+                    .ok_or("Dockerfile path is required")?
+                {
+                    SubstitutionResult::Single(s) => s,
+                    SubstitutionResult::Multiple(_) => {
+                        return Err("Dockerfile path parameter cannot be an array".to_string());
+                    }
+                }
+            }
             None => "Dockerfile".to_string(),
         };
 
@@ -81,6 +99,12 @@ impl ScriptExecutor for DockerStopScript {
             .container
             .substitute_parameters(parameters, false)?
             .ok_or("Container name is required")?;
+        let container = match container {
+            SubstitutionResult::Single(s) => s,
+            SubstitutionResult::Multiple(_) => {
+                return Err("Container name parameter cannot be an array".to_string());
+            }
+        };
 
         docker_stop_and_rm(&container, directory, job_result);
         Ok(())
@@ -91,7 +115,7 @@ impl ScriptExecutor for DockerStopScript {
 #[serde(untagged)]
 pub enum DockerRunArg {
     Direct(String),
-    EnvFromCredential { credential_variable: String },
+    EnvFromCredential { credential_id: String },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
@@ -114,6 +138,12 @@ impl ScriptExecutor for DockerRunScript {
             .image
             .substitute_parameters(parameters, false)?
             .ok_or("Image name is required")?;
+        let image = match image {
+            SubstitutionResult::Single(s) => s,
+            SubstitutionResult::Multiple(_) => {
+                return Err("Image name parameter cannot be an array".to_string());
+            }
+        };
 
         let mut final_args: Vec<String> = Vec::new();
 
@@ -122,6 +152,12 @@ impl ScriptExecutor for DockerRunScript {
             let name = container_name
                 .substitute_parameters(parameters, false)?
                 .ok_or("Container name substitution failed")?;
+            let name = match name {
+                SubstitutionResult::Single(s) => s,
+                SubstitutionResult::Multiple(_) => {
+                    return Err("Container name parameter cannot be an array".to_string());
+                }
+            };
             final_args.push("--name".to_string());
             final_args.push(name);
         }
@@ -133,21 +169,37 @@ impl ScriptExecutor for DockerRunScript {
                     let processed_arg = arg_str
                         .substitute_parameters(parameters, false)?
                         .ok_or("Argument substitution failed")?;
-                    final_args.push(processed_arg);
-                }
-                DockerRunArg::EnvFromCredential { credential_variable } => {
-                    let param_key = format!("variables.{}", credential_variable);
-
-                    if let Some(ScriptParameterType::StringArray(arr)) = parameters.get(&param_key) {
-                        for arg in arr {
-                            final_args.push(format!("--env {}", arg));
+                    match processed_arg {
+                        SubstitutionResult::Single(s) => final_args.push(s),
+                        SubstitutionResult::Multiple(a) => {
+                            for s in a {
+                                final_args.push(s);
+                            }
                         }
-                    } else {
-                        return Err(format!(
-                            "Cannot find saved array for credential {}",
-                            credential_variable
-                        ));
                     }
+                }
+                DockerRunArg::EnvFromCredential { credential_id } => {
+                    let credential_id_resolved = credential_id.substitute_parameters(parameters, true)?;
+                    match credential_id_resolved {
+                        Some(id) => match id {
+                            SubstitutionResult::Single(s) => {
+                                let credential = Credential::get(&s);
+                                if let Some(credential) = credential {
+                                    let value = match credential.value {
+                                        CredentialType::Env(env) => env.value,
+                                        _ => {
+                                            return Err("Credential is not of type Env".to_string());
+                                        }
+                                    };
+                                    for line in value.lines() {
+                                        final_args.push(format!("--env {}", line));
+                                    }
+                                }
+                            }
+                            SubstitutionResult::Multiple(_) => {}
+                        },
+                        None => {}
+                    };
                 }
             }
         }

@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     job::JobResult,
-    script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
+    script::{
+        utils::{ParameterSubstitution, SubstitutionResult},
+        ScriptExecutor, ScriptParameterType,
+    },
     utils::execute_command,
 };
 
@@ -24,10 +27,14 @@ impl ScriptExecutor for BashScript {
     ) -> Result<(), String> {
         // Replace all parameter references in the code
         let replaced_code = self.code.substitute_parameters(parameters, false)?.unwrap();
+        let replaced_code = match replaced_code {
+            SubstitutionResult::Single(s) => s,
+            SubstitutionResult::Multiple(_) => {
+                return Err("Code parameter cannot be an array".to_string());
+            }
+        };
 
-        // Split into lines and execute each command
-        let binding = replaced_code.replace("\r\n", "\n");
-        let lines = binding.split('\n');
+        let lines = replaced_code.lines();
         for line in lines {
             if line.is_empty() {
                 continue;
