@@ -19,6 +19,7 @@ async fn main() {
 
     // build our application with a route
     let app = Router::new()
+        .route("/public/api/webhook", routing::post(job_webhook_trigger))
         .route("/api/credentials", routing::get(get_credentials))
         .route("/api/credentials/:id", routing::get(get_credential))
         .route("/api/credentials", routing::post(create_credential))

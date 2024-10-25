@@ -4,6 +4,9 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
+use sha2::Sha256;
+use hmac::{Hmac, Mac};
+
 use crate::{job::JobResult, log::LogLevel};
 
 pub fn execute_command(command: &str, directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
@@ -87,4 +90,13 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
     } else {
         Err(format!("Process exited with status: {}", status))
     }
+}
+
+type HmacSha256 = Hmac<Sha256>;
+pub fn is_signature_valid(payload: &str, signature: &str, secret: &str) -> bool {
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("Invalid key length");
+    mac.update(payload.as_bytes());
+    let result = mac.finalize();
+    let result = hex::encode(result.into_bytes());
+    result == signature
 }

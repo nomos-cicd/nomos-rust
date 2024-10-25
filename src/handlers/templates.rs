@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 use crate::{
     credential::{Credential, CredentialType},
-    job::{self, JobResult},
+    job::{self, Job, JobResult},
     log::LogLevel,
     script::models::Script,
 };
@@ -178,6 +178,14 @@ struct JobTemplate<'a> {
     // json_schema: &'a str,
 }
 
+#[derive(Deserialize, Default)]
+pub struct JobFormQuery {
+    #[serde(rename = "from-script-id")]
+    from_script_id: Option<String>,
+    #[serde(rename = "from-job-id")]
+    from_job_id: Option<String>,
+}
+
 pub async fn template_jobs() -> Html<String> {
     let jobs = job::Job::get_all().unwrap();
     let template = JobsTemplate { title: "Jobs", jobs };
@@ -185,14 +193,14 @@ pub async fn template_jobs() -> Html<String> {
 }
 
 pub async fn template_update_job(Path(id): Path<String>) -> Html<String> {
-    template_job(Some(axum::extract::Path(id)), "Jobs").await
+    template_job(Some(axum::extract::Path(id)), "Jobs", Default::default()).await
 }
 
-pub async fn template_create_job() -> Html<String> {
-    template_job(None, "Create Job").await
+pub async fn template_create_job(params: Query<JobFormQuery>) -> Html<String> {
+    template_job(None, "Create Job", params).await
 }
 
-pub async fn template_job(id: Option<Path<String>>, title: &str) -> Html<String> {
+pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<JobFormQuery>) -> Html<String> {
     let job = if let Some(id) = id {
         job::Job::get(id.as_str())
     } else {
@@ -202,6 +210,20 @@ pub async fn template_job(id: Option<Path<String>>, title: &str) -> Html<String>
     let mut job_yaml = None;
     if let Some(job) = job.as_ref() {
         job_yaml = Some(serde_yaml::to_string(job).unwrap());
+    }
+
+    if let Some(from_script_id) = &params.from_script_id {
+        let script = Script::get(from_script_id.as_str());
+        if let Some(script) = script {
+            job_yaml = Some(serde_yaml::to_string(&Job::from(&script)).unwrap());
+        }
+    }
+
+    if let Some(from_job_id) = &params.from_job_id {
+        let job = job::Job::get(from_job_id.as_str());
+        if let Some(job) = job {
+            job_yaml = Some(serde_yaml::to_string(&job).unwrap());
+        }
     }
 
     // let json_schema = job::Job::get_json_schema();

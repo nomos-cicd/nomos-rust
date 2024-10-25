@@ -12,7 +12,7 @@ triggers:
     events:
       - push
       - pull_request
-    secret: secret
+    secret_credential_id: secret
     url: https://github.com/owner/repo
 script_id: test-script
 read_only: false

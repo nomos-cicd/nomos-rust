@@ -4,6 +4,7 @@ mod utils;
 
 pub use job_result::JobResult;
 pub use trigger::TriggerType;
+pub use trigger::GithubPayload;
 pub use utils::{default_job_results_location, default_jobs_location, next_job_result_id};
 
 use schemars::{schema_for, JsonSchema};
@@ -185,5 +186,26 @@ impl TryFrom<PathBuf> for Job {
         let file = File::open(path).map_err(|_| "Could not open file")?;
         let reader = BufReader::new(file);
         serde_yaml::from_reader(reader).map_err(|e| e.to_string())
+    }
+}
+
+impl From<&Script> for Job {
+    fn from(script: &Script) -> Self {
+        let parameters = script.parameters.iter().map(|p| JobParameterDefinition {
+            name: p.name.clone(),
+            default: p.default.clone(),
+        });
+
+        Job {
+            id: "id".to_string(),
+            name: script.name.clone(),
+            parameters: parameters.collect(),
+            triggers: vec![
+                TriggerType::Manual(Default::default()),
+                TriggerType::Github(Default::default()),
+            ],
+            script_id: script.id.clone(),
+            read_only: false,
+        }
     }
 }
