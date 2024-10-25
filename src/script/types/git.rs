@@ -69,14 +69,16 @@ impl ScriptExecutor for GitCloneScript {
             None => "main".to_string(),
         };
 
-        git_clone(
-            &url,
-            branch.as_str(),
-            directory.clone(),
-            credential_id.as_deref(),
-            job_result,
-        )
-        .map_err(|e| e.to_string())?;
+        if !job_result.dry_run {
+            git_clone(
+                &url,
+                branch.as_str(),
+                directory.clone(),
+                credential_id.as_deref(),
+                job_result,
+            )
+            .map_err(|e| e.to_string())?;
+        }
 
         let mut cloned_dir = directory.clone().join(url.split('/').last().unwrap());
         if cloned_dir.to_str().unwrap().ends_with(".git") {

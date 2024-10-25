@@ -67,14 +67,18 @@ impl ScriptExecutor for DockerBuildScript {
             directory.join(dockerfile)
         };
 
-        if !dockerfile_path.exists() {
-            return Err(format!(
-                "Dockerfile does not exist at path: {}",
-                dockerfile_path.display()
-            ));
+        if !job_result.dry_run {
+            if !dockerfile_path.exists() {
+                return Err(format!(
+                    "Dockerfile does not exist at path: {}",
+                    dockerfile_path.display()
+                ));
+            }
+
+            docker_build(&image, dockerfile_path, directory, job_result)?
         }
 
-        docker_build(&image, dockerfile_path, directory, job_result)
+        Ok(())
     }
 }
 
@@ -104,7 +108,9 @@ impl ScriptExecutor for DockerStopScript {
             }
         };
 
-        docker_stop_and_rm(&container, directory, job_result);
+        if !job_result.dry_run {
+            docker_stop_and_rm(&container, directory, job_result);
+        }
         Ok(())
     }
 }
@@ -197,6 +203,10 @@ impl ScriptExecutor for DockerRunScript {
         // Convert to &str for docker_run function
         let args_ref: Vec<&str> = final_args.iter().map(|s| s.as_str()).collect();
 
-        docker_run(&image, args_ref, directory, job_result)
+        if !job_result.dry_run {
+            docker_run(&image, args_ref, directory, job_result)?
+        }
+
+        Ok(())
     }
 }

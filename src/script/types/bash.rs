@@ -39,8 +39,9 @@ impl ScriptExecutor for BashScript {
             if line.is_empty() {
                 continue;
             }
-            execute_command(line, directory.clone(), job_result)
-                .map_err(|e| format!("Error executing command: {}", e))?;
+            if !job_result.dry_run {
+                execute_command(line, directory.clone(), job_result)?;
+            }
         }
 
         Ok(())

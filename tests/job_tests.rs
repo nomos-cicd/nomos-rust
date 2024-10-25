@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use nomos_rust::job::{Job, JobResult};
-use nomos_rust::script::models::Script;
+use nomos_rust::script::models::{Script, YamlScriptStep};
+use nomos_rust::script::types::{BashScript, ScriptType};
 use nomos_rust::script::ScriptParameterType;
 
 #[test]
@@ -93,4 +94,32 @@ async fn docker_job() {
         assert!(step.is_started);
         assert!(step.finished_at > step.started_at);
     }
+}
+
+#[test]
+fn validation() {
+    // Missing git step
+    let script = Script {
+        steps: vec![YamlScriptStep {
+            name: "Test Step".to_string(),
+            values: vec![ScriptType::Bash(BashScript {
+                code: "echo $(missing.param)".to_string(),
+            })],
+        }],
+        ..Default::default()
+    };
+    let job = Job {
+        id: "test-job".to_string(),
+        name: "Test Job".to_string(),
+        parameters: vec![],
+        triggers: vec![],
+        script_id: "test-script".to_string(),
+        read_only: false,
+    };
+    let result = job.validate(Some(&script), Default::default());
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        "Error in step Test Step: \"Parameter 'missing.param' not found\""
+    );
 }

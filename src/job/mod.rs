@@ -56,7 +56,7 @@ impl Job {
     }
 
     pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
-        self.validate_parameters(None)?;
+        self.validate(None, Default::default())?;
 
         let existing_job = Job::get(self.id.as_str());
         if let Some(existing_job) = existing_job {
@@ -103,48 +103,25 @@ impl Job {
         parameters: HashMap<String, ScriptParameterType>,
         script: &Script,
     ) -> Result<String, String> {
-        self.validate_parameters(Some(script))?;
+        self.validate(Some(script), parameters.clone())?;
 
-        let mut merged_parameters = parameters.clone();
-        for parameter in &self.parameters {
-            if !parameters.contains_key(&parameter.name) {
-                if let Some(default) = &parameter.default {
-                    merged_parameters.insert(parameter.name.clone(), default.clone());
-                }
-            }
-        }
+        let mut merged_parameters = self.merged_parameters(Some(script), parameters.clone())?;
 
-        let mut missing_parameters = vec![];
-        for parameter in &self.parameters {
-            if !merged_parameters.contains_key(&parameter.name) {
-                missing_parameters.push(parameter.name.clone());
-            }
-        }
-        if !missing_parameters.is_empty() {
-            panic!("Missing parameters: {}", missing_parameters.join(", "));
-        }
-
-        // Add 'parameters.' to each parameter
-        let mut merged_parameters_with_prefix = HashMap::new();
-        for (key, value) in merged_parameters.clone() {
-            merged_parameters_with_prefix.insert(format!("parameters.{}", key), value);
-        }
-
-        let mut job_result = JobResult::from((self, script));
+        let mut job_result = JobResult::from((self, script, false));
         let id = job_result.id.clone();
         let directory = default_job_results_location().join(&job_result.id);
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         job_result.save();
 
         tokio::spawn(async move {
-            let _ = Job::execute_job_result(&mut job_result, directory, &mut merged_parameters_with_prefix).await;
+            let _ = Job::execute_job_result(&mut job_result, directory, &mut merged_parameters);
         });
 
         Ok(id)
     }
 
     /// parameters should be prepared by the caller
-    pub async fn execute_job_result(
+    pub fn execute_job_result(
         job_result: &mut JobResult,
         directory: PathBuf,
         parameters: &mut HashMap<String, ScriptParameterType>,
@@ -161,12 +138,13 @@ impl Job {
             let result = current_step.execute(parameters, directory.clone(), step_name.as_str(), job_result);
 
             if result.is_err() {
-                job_result.add_log(
-                    LogLevel::Error,
-                    format!("Error in step {}: {:?}", step_name, result.err().unwrap()),
-                );
+                let message = format!("Error in step {}: {:?}", step_name, result.err().unwrap());
+                job_result.add_log(LogLevel::Error, message.clone());
                 job_result.finish_step(false);
                 is_success = false;
+                if job_result.dry_run {
+                    return Err(message.clone());
+                }
                 break;
             }
             job_result.finish_step(true);
@@ -199,7 +177,10 @@ impl Job {
 
         let mut missing_parameters = vec![];
         for parameter in &script.parameters {
-            if !self.parameters.iter().any(|p| p.name == parameter.name) && parameter.default.is_none() && parameter.required {
+            if !self.parameters.iter().any(|p| p.name == parameter.name)
+                && parameter.default.is_none()
+                && parameter.required
+            {
                 missing_parameters.push(parameter.name.clone());
             }
         }
@@ -209,6 +190,69 @@ impl Job {
         }
 
         Ok(())
+    }
+
+    /// Merges script and job parameters. Respects default values.
+    /// Also adds 'parameters.' prefix to each parameter.
+    pub fn merged_parameters(
+        &self,
+        script: Option<&Script>,
+        parameters: HashMap<String, ScriptParameterType>,
+    ) -> Result<HashMap<String, ScriptParameterType>, String> {
+        let script_opt: Option<Script> = match script {
+            Some(script) => Some(script.clone()),
+            None => {
+                let self_script = Script::get(&self.script_id).ok_or("Could not get script")?;
+                Some(self_script.clone())
+            }
+        };
+        let script = script_opt.unwrap();
+
+        let mut merged_parameters = HashMap::new();
+        for parameter in &script.parameters {
+            let job_parameter = self.parameters.iter().find(|p| p.name == parameter.name);
+            let value = match job_parameter {
+                Some(job_parameter) => {
+                    let value = parameters.get(&job_parameter.name).cloned();
+                    if value.is_none() {
+                        job_parameter.default.clone()
+                    } else {
+                        value
+                    }
+                }
+                None => parameter.default.clone(),
+            };
+
+            if let Some(value) = value {
+                merged_parameters.insert(format!("parameters.{}", parameter.name), value);
+            }
+        }
+
+        Ok(merged_parameters)
+    }
+
+    pub fn validate(
+        &self,
+        script: Option<&Script>,
+        parameters: HashMap<String, ScriptParameterType>,
+    ) -> Result<(), String> {
+        self.validate_parameters(script)?;
+        let mut merged_parameters = self.merged_parameters(script, parameters)?;
+        let script_opt: Option<Script> = match script {
+            Some(script) => Some(script.clone()),
+            None => {
+                let self_script = Script::get(&self.script_id).ok_or("Could not get script")?;
+                Some(self_script.clone())
+            }
+        };
+        let script = script_opt.unwrap();
+
+        let directory = PathBuf::from("tmp");
+        Job::execute_job_result(
+            &mut JobResult::from((self, &script, true)),
+            directory,
+            &mut merged_parameters,
+        )
     }
 }
 

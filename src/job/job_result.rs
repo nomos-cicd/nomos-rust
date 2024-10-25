@@ -21,6 +21,8 @@ pub struct JobResult {
     pub updated_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
     pub logger: JobLogger,
+    #[serde(skip)]
+    pub dry_run: bool,
 }
 
 impl JobResult {
@@ -82,6 +84,9 @@ impl JobResult {
 
     pub fn add_log(&mut self, level: LogLevel, message: String) {
         eprintln!("{:?}: {}", level, message);
+        if self.dry_run {
+            return;
+        }
         if let Some(current_step_name) = &self.current_step_name {
             let _ = self.logger.log(level, current_step_name, &message);
         }
@@ -113,6 +118,9 @@ impl JobResult {
     }
 
     pub fn save(&self) {
+        if self.dry_run {
+            return;
+        }
         let path = default_job_results_location().join(&self.id).join("result.yml");
         let file = File::create(path).map_err(|e| e.to_string()).unwrap();
         serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
@@ -155,6 +163,7 @@ impl Default for JobResult {
             updated_at: Utc::now(),
             finished_at: None,
             logger,
+            dry_run: false,
         }
     }
 }
@@ -173,13 +182,20 @@ impl From<&Job> for JobResult {
     }
 }
 
-impl From<(&Job, &Script)> for JobResult {
-    fn from((job, script): (&Job, &Script)) -> Self {
+impl From<(&Job, &Script, bool)> for JobResult {
+    fn from((job, script, dry_mode): (&Job, &Script, bool)) -> Self {
+        let id = if !dry_mode {
+            next_job_result_id().unwrap()
+        } else {
+            "dry_run".to_string()
+        };
         let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
         JobResult {
+            id,
             job_id: job.id.clone(),
             steps: steps.clone(),
             current_step_name: steps.first().map(|step| step.name.clone()),
+            dry_run: dry_mode,
             ..Default::default()
         }
     }
