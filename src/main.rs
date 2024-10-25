@@ -20,11 +20,20 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _ = std::env::var("NOMOS_USERNAME").map_err(|_| {
+        eprintln!("NOMOS_USERNAME environment variable is not set.");
+        std::process::exit(1);
+    });
+    let _ = std::env::var("NOMOS_PASSWORD").map_err(|_| {
+        eprintln!("NOMOS_PASSWORD environment variable is not set.");
+        std::process::exit(1);
+    });
+
     // initialize tracing
     tracing_subscriber::registry()
-        .with(EnvFilter::new(std::env::var("RUST_LOG").unwrap_or_else(|_| {
-            "axum_login=debug,tower_http=debug".into()
-        })))
+        .with(EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "axum_login=debug,tower_http=debug".into()),
+        ))
         .with(tracing_subscriber::fmt::layer())
         .try_init()?;
 

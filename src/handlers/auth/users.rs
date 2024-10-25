@@ -65,31 +65,29 @@ impl AuthnBackend for Backend {
             next: _,
         }: Self::Credentials,
     ) -> Result<Option<Self::User>, Self::Error> {
-        // let user = self
-        //     .users
-        //     .values()
-        //     .find(|user| user.username == username && user.password == password);
+        let expected_username = std::env::var("NOMOS_USERNAME").unwrap();
+        let expected_password = std::env::var("NOMOS_PASSWORD").unwrap();
+        if username != expected_username || password != expected_password {
+            return Ok(None);
+        }
 
-        // if let Some(user) = user {
-        //     Ok(Some(user.clone()))
-        // } else {
-        //     Ok(None)
-        // }
-        let user = Self::User {
+        let user = User {
             id: 1,
             username,
             password,
         };
-        // self.users.insert(1, user.clone());
+
         return Ok(user.into());
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
-        // Ok(self.users.get(user_id).cloned())
+        let username = std::env::var("NOMOS_USERNAME").unwrap();
+        let password = std::env::var("NOMOS_PASSWORD").unwrap();
+
         return Ok(Some(Self::User {
             id: *user_id,
-            username: "admin".to_string(),
-            password: "admin".to_string(),
+            username,
+            password,
         }));
     }
 }
