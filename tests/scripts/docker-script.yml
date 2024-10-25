@@ -4,9 +4,6 @@ parameters:
   - name: git_url
     description: Image
     required: true
-    default:
-      type: string
-      value: ""
   - name: git_branch
     description: Image
     required: false
@@ -16,9 +13,6 @@ parameters:
   - name: docker_image
     description: Image
     required: true
-    default:
-      type: string
-      value: ""
   - name: docker_dockerfile
     description: Dockerfile
     required: false
@@ -28,9 +22,6 @@ parameters:
   - name: credential_id_for_env_variables
     description: Credential ID for environment variables
     required: false
-    default:
-      type: credential
-      value: ""
   - name: docker_args
     description: Docker arguments
     required: false

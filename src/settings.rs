@@ -75,7 +75,11 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         let entry = entry.unwrap();
         let path = entry.path();
         let job = Job::try_from(path).unwrap();
-        job.sync(job_result.into());
+        let res = job.sync(job_result.into());
+        if let Err(e) = res {
+            job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
+            continue;
+        }
         job_ids.push(job.id.clone());
     }
     let jobs = Job::get_all().unwrap();

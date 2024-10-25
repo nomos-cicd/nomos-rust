@@ -3,8 +3,8 @@ mod trigger;
 mod utils;
 
 pub use job_result::JobResult;
-pub use trigger::TriggerType;
 pub use trigger::GithubPayload;
+pub use trigger::TriggerType;
 pub use utils::{default_job_results_location, default_jobs_location, next_job_result_id};
 
 use schemars::{schema_for, JsonSchema};
@@ -55,7 +55,9 @@ impl Job {
         Ok(jobs)
     }
 
-    pub fn sync(&self, job_result: Option<&mut JobResult>) {
+    pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
+        self.validate_parameters(None)?;
+
         let existing_job = Job::get(self.id.as_str());
         if let Some(existing_job) = existing_job {
             if existing_job.name != self.name
@@ -76,6 +78,8 @@ impl Job {
                 job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id))
             }
         }
+
+        Ok(())
     }
 
     fn save(&self) {
@@ -99,6 +103,8 @@ impl Job {
         parameters: HashMap<String, ScriptParameterType>,
         script: &Script,
     ) -> Result<String, String> {
+        self.validate_parameters(Some(script))?;
+
         let mut merged_parameters = parameters.clone();
         for parameter in &self.parameters {
             if !parameters.contains_key(&parameter.name) {
@@ -176,6 +182,33 @@ impl Job {
     pub fn get_json_schema() -> Result<serde_json::Value, String> {
         let schema = schema_for!(Job);
         serde_json::to_value(schema).map_err(|e| e.to_string())
+    }
+
+    /// Checks parameters against script parameters. Respects default values.
+    /// If script has a parameter without a default value, it must be provided.
+    /// If script has a parameter with a default value, it can be omitted.
+    pub fn validate_parameters(&self, script: Option<&Script>) -> Result<(), String> {
+        let script_opt: Option<Script> = match script {
+            Some(script) => Some(script.clone()),
+            None => {
+                let self_script = Script::get(&self.script_id).ok_or("Could not get script")?;
+                Some(self_script.clone())
+            }
+        };
+        let script = script_opt.unwrap();
+
+        let mut missing_parameters = vec![];
+        for parameter in &script.parameters {
+            if !self.parameters.iter().any(|p| p.name == parameter.name) && parameter.default.is_none() && parameter.required {
+                missing_parameters.push(parameter.name.clone());
+            }
+        }
+
+        if !missing_parameters.is_empty() {
+            return Err(format!("Missing parameters: {}", missing_parameters.join(", ")));
+        }
+
+        Ok(())
     }
 }
 

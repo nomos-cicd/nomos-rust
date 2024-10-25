@@ -8,7 +8,7 @@ use crate::{job::JobResult, log::LogLevel};
 
 use super::{default_scripts_location, types::ScriptType, ScriptParameter};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone, JsonSchema)]
 pub struct Script {
     pub id: String,
     pub name: String,
@@ -27,7 +27,7 @@ pub struct ScriptStep {
     pub finished_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Default, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Default, PartialEq, JsonSchema, Clone, Debug)]
 pub struct YamlScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,

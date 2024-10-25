@@ -117,7 +117,10 @@ pub async fn create_job(headers: HeaderMap, body: String) -> (StatusCode, Json<j
     }
 
     let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
-    job.sync(None);
+    let res = job.sync(None);
+    if res.is_err() {
+        return (StatusCode::BAD_REQUEST, Json(job::Job::default()));
+    }
     (StatusCode::CREATED, Json(job))
 }
 
@@ -155,8 +158,8 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode
     let jobs = jobs.unwrap();
     for job in jobs {
         for trigger in job.triggers.iter() {
-            match &trigger {
-                &job::TriggerType::Github(val) => {
+            match trigger {
+                job::TriggerType::Github(val) => {
                     let signature = headers.get("x-hub-signature-256");
                     let github_event = headers.get("x-github-event");
                     if signature.is_none() || github_event.is_none() {
@@ -197,12 +200,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode
                         eprintln!("Repository does not match");
                         continue;
                     }
-                    if val
-                        .events
-                        .iter()
-                        .find(|&x| x == github_event.unwrap().to_str().unwrap())
-                        .is_none()
-                    {
+                    if !val.events.iter().any(|x| x == github_event.unwrap().to_str().unwrap()) {
                         eprintln!("Event does not match");
                         continue;
                     }
@@ -219,7 +217,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode
                         eprintln!("Job started: {}", job_result.unwrap());
                     }
                 }
-                &job::TriggerType::Manual(_) => {}
+                job::TriggerType::Manual(_) => {}
             }
         }
     }
