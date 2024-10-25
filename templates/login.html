@@ -1,0 +1,36 @@
+{% extends "fragment-base.html" %}
+
+{% block body %}
+<div class="uk-container uk-margin">
+  <div class="uk-card uk-card-default uk-card-body">
+    <form method="post">
+      <fieldset class="uk-fieldset">
+        <legend class="uk-legend">User Login</legend>
+
+        <div class="uk-margin">
+          <label class="uk-form-label" for="username">Username</label>
+          <div class="uk-form-controls">
+            <input class="uk-input" type="text" name="username" id="username" placeholder="Username" value="ferris" />
+          </div>
+        </div>
+
+        <div class="uk-margin">
+          <label class="uk-form-label" for="password">Password</label>
+          <div class="uk-form-controls">
+            <input class="uk-input" type="password" name="password" id="password" placeholder="Password"
+              value="hunter42" />
+          </div>
+        </div>
+
+        {% if let Some(next) = next %}
+        <input type="hidden" name="next" value="{{next}}" />
+        {% endif %}
+
+        <div class="uk-margin">
+          <button class="uk-button uk-button-primary" type="submit">Login</button>
+        </div>
+      </fieldset>
+    </form>
+  </div>
+</div>
+{% endblock %}

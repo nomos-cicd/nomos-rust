@@ -9,17 +9,35 @@ mod settings;
 mod utils;
 
 use axum::{routing, Router};
+use axum_login::{
+    login_required,
+    tower_sessions::{MemoryStore, SessionManagerLayer},
+    AuthManagerLayerBuilder,
+};
 use handlers::*;
 use tower_http::cors::CorsLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // initialize tracing
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::registry()
+        .with(EnvFilter::new(std::env::var("RUST_LOG").unwrap_or_else(|_| {
+            "axum_login=debug,tower_http=debug".into()
+        })))
+        .with(tracing_subscriber::fmt::layer())
+        .try_init()?;
+
+    // Session layer.
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store);
+
+    // Auth service.
+    let backend = Backend::default();
+    let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
     // build our application with a route
     let app = Router::new()
-        .route("/public/api/webhook", routing::post(job_webhook_trigger))
         .route("/api/credentials", routing::get(get_credentials))
         .route("/api/credentials/:id", routing::get(get_credential))
         .route("/api/credentials", routing::post(create_credential))
@@ -53,9 +71,16 @@ async fn main() {
         .route("/job-results", routing::get(template_job_results))
         .route("/job-results/:id", routing::get(template_job_result))
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
+        .route_layer(login_required!(Backend, login_url = "/login"))
+        .route("/login", routing::get(template_get_login))
+        .route("/login", routing::post(template_post_login))
+        .route("/public/api/webhook", routing::post(job_webhook_trigger))
+        .layer(auth_layer)
         .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app.into_make_service()).await?;
+
+    Ok(())
 }
