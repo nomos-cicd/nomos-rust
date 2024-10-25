@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use axum::{
-    extract::Path,
+    extract::{Path, Query},
     http::{HeaderMap, StatusCode},
     Json,
 };
+use serde::Deserialize;
 
 use crate::{
     credential::{self, YamlCredential},
@@ -253,8 +254,14 @@ pub async fn get_job_trigger_types() -> Json<serde_json::Value> {
     Json(job_trigger_types)
 }
 
-pub async fn get_job_results() -> Json<Vec<job::JobResult>> {
-    let job_results = job::JobResult::get_all().unwrap();
+#[derive(Deserialize)]
+pub struct JobResultsQuery {
+    #[serde(rename = "job-id")]
+    job_id: Option<String>,
+}
+
+pub async fn get_job_results(query: Query<JobResultsQuery>) -> Json<Vec<job::JobResult>> {
+    let job_results = job::JobResult::get_all(query.job_id.clone()).unwrap();
     Json(job_results)
 }
 

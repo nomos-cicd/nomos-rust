@@ -92,7 +92,7 @@ impl JobResult {
         }
     }
 
-    pub fn get_all() -> Result<Vec<Self>, String> {
+    pub fn get_all(job_id: Option<String>) -> Result<Vec<Self>, String> {
         let path = default_job_results_location();
         let mut job_results = Vec::new();
         for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
@@ -101,7 +101,13 @@ impl JobResult {
             path.push("result.yml");
             let job_result =
                 JobResult::try_from(path.clone()).map_err(|e| format!("Path: {:?}, Error: {:?}", path, e))?;
-            job_results.push(job_result);
+            if let Some(job_id) = job_id.clone() {
+                if job_result.job_id == job_id {
+                    job_results.push(job_result);
+                }
+            } else {
+                job_results.push(job_result);
+            }
         }
         job_results.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         Ok(job_results)

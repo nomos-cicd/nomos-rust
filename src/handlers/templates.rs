@@ -264,8 +264,13 @@ struct FormattedLog<'a> {
     message: &'a str,
 }
 
-pub async fn template_job_results() -> Html<String> {
-    let results = JobResult::get_all().unwrap();
+#[derive(Deserialize)]
+pub struct JobResultsQuery {
+    #[serde(rename = "job-id")]
+    job_id: Option<String>,
+}
+pub async fn template_job_results(query: Query<JobResultsQuery>) -> Html<String> {
+    let results = JobResult::get_all(query.job_id.clone()).unwrap();
     let template = JobResultsTemplate {
         title: "Job Results",
         results,

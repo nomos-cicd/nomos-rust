@@ -37,6 +37,13 @@
                                 class="uk-button uk-button-primary uk-button-small">
                                 Clone job
                             </a>
+                            <a href="/scripts/{{ job.script_id }}" class="uk-button uk-button-default uk-button-small">
+                                View script
+                            </a>
+                            <a href="/job-results?job-id={{ job.id }}"
+                                class="uk-button uk-button-default uk-button-small">
+                                View results
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}

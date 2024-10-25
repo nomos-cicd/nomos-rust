@@ -23,8 +23,16 @@ impl Settings {
                 job_result.add_log(LogLevel::Error, format!("Error syncing credential: {:?}", e));
                 continue;
             }
+            let credential = credential.unwrap();
+            if credential.read_only {
+                job_result.add_log(
+                    LogLevel::Info,
+                    format!("Skipping read-only credential {:?}", credential.id),
+                );
+                continue;
+            }
 
-            credential.unwrap().sync(job_result.into());
+            credential.sync(job_result.into());
             credential_ids.push(yaml_credential.id.clone());
         }
 
@@ -75,6 +83,10 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         let entry = entry.unwrap();
         let path = entry.path();
         let job = Job::try_from(path).unwrap();
+        if job.read_only {
+            job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
+            continue;
+        }
         let res = job.sync(job_result.into());
         if let Err(e) = res {
             job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));

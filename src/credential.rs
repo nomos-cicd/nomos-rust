@@ -113,9 +113,11 @@ impl Credential {
     }
 
     pub fn sync(&self, job_result: Option<&mut JobResult>) {
+        let current_type = self.get_credential_type();
         let existing_credential = Credential::get(self.id.as_str());
         if let Some(existing_credential) = existing_credential {
-            if existing_credential != *self {
+            let existing_type = existing_credential.get_credential_type();
+            if existing_type.to_string() != *current_type.to_string() {
                 self.save();
                 if let Some(job_result) = job_result {
                     job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
