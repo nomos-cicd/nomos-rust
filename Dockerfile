@@ -17,6 +17,8 @@ COPY --from=deps-builder /app/target target
 COPY --from=deps-builder /app/Cargo.toml /app/Cargo.lock ./
 # Copy the actual source code
 COPY src src
+# Copy templates for askama
+COPY templates templates
 # Build the application with static linking
 RUN rustup target add x86_64-unknown-linux-musl && \
     RUSTFLAGS='-C target-feature=+crt-static' cargo build --release --target x86_64-unknown-linux-musl

@@ -52,11 +52,11 @@
             body: job
         });
 
-        const result = await response.text();
+        const data = await response.text();
         if (response.ok) {
             alert("Success");
         } else {
-            alert(`Error: ${result}`);
+            alert(`Error: ${data}`);
         }
     }
 </script>

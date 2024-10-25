@@ -106,23 +106,23 @@ pub async fn get_job(Path(id): Path<String>) -> (StatusCode, Json<job::Job>) {
     (StatusCode::OK, Json(job.unwrap()))
 }
 
-pub async fn create_job(headers: HeaderMap, body: String) -> (StatusCode, Json<job::Job>) {
+pub async fn create_job(headers: HeaderMap, body: String) -> (StatusCode, String) {
     let content_type = headers.get("content-type");
     if content_type.is_none() {
-        return (StatusCode::BAD_REQUEST, Json(job::Job::default()));
+        return (StatusCode::BAD_REQUEST, "Empty content-type".to_string());
     }
 
     let content_type = content_type.unwrap().to_str().unwrap();
     if content_type != "application/yaml" {
-        return (StatusCode::BAD_REQUEST, Json(job::Job::default()));
+        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported".to_string());
     }
 
     let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
     let res = job.sync(None);
     if res.is_err() {
-        return (StatusCode::BAD_REQUEST, Json(job::Job::default()));
+        return (StatusCode::BAD_REQUEST, res.unwrap_err());
     }
-    (StatusCode::CREATED, Json(job))
+    (StatusCode::CREATED, job.id)
 }
 
 pub async fn delete_job(Path(id): Path<String>) -> StatusCode {
