@@ -44,15 +44,12 @@ impl ScriptExecutor for GitCloneScript {
             None => None,
         };
         let credential_id = match credential_id {
-            Some(id) => {
-                let id = match id {
-                    SubstitutionResult::Single(s) => Some(s),
-                    SubstitutionResult::Multiple(_) => {
-                        return Err("Credential ID parameter cannot be an array".to_string());
-                    }
-                };
-                id
-            }
+            Some(id) => match id {
+                SubstitutionResult::Single(s) => Some(s),
+                SubstitutionResult::Multiple(_) => {
+                    return Err("Credential ID parameter cannot be an array".to_string());
+                }
+            },
             None => None,
         };
 

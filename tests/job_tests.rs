@@ -43,15 +43,15 @@ async fn do_execute_job() -> String {
 
 #[tokio::test]
 async fn job_result_id_test() {
-    let thread_1 = tokio::spawn(async { do_execute_job() });
-    let thread_2 = tokio::spawn(async { do_execute_job() });
-    let thread_3 = tokio::spawn(async { do_execute_job() });
-    let thread_4 = tokio::spawn(async { do_execute_job() });
+    let thread_1 = tokio::spawn(async { do_execute_job().await });
+    let thread_2 = tokio::spawn(async { do_execute_job().await });
+    let thread_3 = tokio::spawn(async { do_execute_job().await });
+    let thread_4 = tokio::spawn(async { do_execute_job().await });
 
-    let id_1 = thread_1.await.unwrap().await;
-    let id_2 = thread_2.await.unwrap().await;
-    let id_3 = thread_3.await.unwrap().await;
-    let id_4 = thread_4.await.unwrap().await;
+    let id_1 = thread_1.await.unwrap();
+    let id_2 = thread_2.await.unwrap();
+    let id_3 = thread_3.await.unwrap();
+    let id_4 = thread_4.await.unwrap();
 
     assert_ne!(id_1, id_2);
     assert_ne!(id_1, id_3);

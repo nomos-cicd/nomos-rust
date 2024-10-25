@@ -3,6 +3,8 @@ pub mod docker;
 pub mod git;
 pub mod sync;
 
+use std::str::FromStr;
+
 pub use bash::BashScript;
 pub use git::GitCloneScript;
 use schemars::JsonSchema;
@@ -26,17 +28,18 @@ pub enum ScriptType {
     DockerRun(docker::DockerRunScript),
 }
 
-impl ScriptType {
-    #[allow(dead_code)]
-    pub fn from_str(t: &str) -> Result<Self, String> {
-        match t {
+impl FromStr for ScriptType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
             "bash" => Ok(ScriptType::Bash(BashScript::default())),
             "git-clone" => Ok(ScriptType::GitClone(GitCloneScript::default())),
             "sync" => Ok(ScriptType::Sync(SyncScript::default())),
             "docker-build" => Ok(ScriptType::DockerBuild(docker::DockerBuildScript::default())),
             "docker-stop" => Ok(ScriptType::DockerStop(docker::DockerStopScript::default())),
             "docker-run" => Ok(ScriptType::DockerRun(docker::DockerRunScript::default())),
-            _ => Err(format!("Unknown script type: {}", t)),
+            _ => Err(format!("Unknown script type: {}", s)),
         }
     }
 }

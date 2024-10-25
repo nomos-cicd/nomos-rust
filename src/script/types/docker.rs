@@ -61,12 +61,10 @@ impl ScriptExecutor for DockerBuildScript {
             } else {
                 directory.join(dockerfile)
             }
+        } else if dockerfile.starts_with('/') {
+            PathBuf::from(dockerfile)
         } else {
-            if dockerfile.starts_with('/') {
-                PathBuf::from(dockerfile)
-            } else {
-                directory.join(dockerfile)
-            }
+            directory.join(dockerfile)
         };
 
         if !dockerfile_path.exists() {
@@ -180,26 +178,18 @@ impl ScriptExecutor for DockerRunScript {
                 }
                 DockerRunArg::EnvFromCredential { credential_id } => {
                     let credential_id_resolved = credential_id.substitute_parameters(parameters, true)?;
-                    match credential_id_resolved {
-                        Some(id) => match id {
-                            SubstitutionResult::Single(s) => {
-                                let credential = Credential::get(&s);
-                                if let Some(credential) = credential {
-                                    let value = match credential.value {
-                                        CredentialType::Env(env) => env.value,
-                                        _ => {
-                                            return Err("Credential is not of type Env".to_string());
-                                        }
-                                    };
-                                    for line in value.lines() {
+                    if let Some(SubstitutionResult::Single(id)) = credential_id_resolved {
+                        if let Some(credential) = Credential::get(&id) {
+                            match credential.value {
+                                CredentialType::Env(env) => {
+                                    for line in env.value.lines() {
                                         final_args.push(format!("--env {}", line));
                                     }
                                 }
+                                _ => return Err("Credential is not of type Env".to_string()),
                             }
-                            SubstitutionResult::Multiple(_) => {}
-                        },
-                        None => {}
-                    };
+                        }
+                    }
                 }
             }
         }

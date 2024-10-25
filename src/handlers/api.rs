@@ -18,7 +18,7 @@ pub async fn get_credentials() -> Json<Vec<credential::Credential>> {
 pub async fn get_credential(Path(id): Path<String>) -> (StatusCode, Json<credential::Credential>) {
     let credential = credential::Credential::get(id.as_str());
     if credential.is_none() {
-        return (StatusCode::NOT_FOUND, Json(credential.unwrap()));
+        return (StatusCode::NOT_FOUND, Json(Default::default()));
     }
 
     (StatusCode::OK, Json(credential.unwrap()))
@@ -52,7 +52,7 @@ pub async fn get_scripts() -> Json<Vec<Script>> {
 pub async fn get_script(Path(id): Path<String>) -> (StatusCode, Json<Script>) {
     let script = Script::get(id.as_str());
     if script.is_none() {
-        return (StatusCode::NOT_FOUND, Json(script.unwrap()));
+        return (StatusCode::NOT_FOUND, Json(Default::default()));
     }
 
     (StatusCode::OK, Json(script.unwrap()))
@@ -96,7 +96,7 @@ pub async fn get_jobs() -> Json<Vec<job::Job>> {
 pub async fn get_job(Path(id): Path<String>) -> (StatusCode, Json<job::Job>) {
     let job = job::Job::get(id.as_str());
     if job.is_none() {
-        return (StatusCode::NOT_FOUND, Json(job.unwrap()));
+        return (StatusCode::NOT_FOUND, Json(Default::default()));
     }
 
     (StatusCode::OK, Json(job.unwrap()))

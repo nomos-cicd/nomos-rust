@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
@@ -39,12 +39,17 @@ impl CredentialType {
         let schema = schemars::schema_for!(CredentialType);
         serde_json::to_value(schema).unwrap()
     }
+}
 
-    pub fn from_str(t: &str) -> Result<Self, String> {
-        match t {
+impl FromStr for CredentialType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
             "text" => Ok(CredentialType::Text(TextCredentialParameter::default())),
             "ssh" => Ok(CredentialType::Ssh(SshCredentialParameter::default())),
-            _ => Err(format!("Unknown credential type: {}", t)),
+            "env" => Ok(CredentialType::Env(EnvCredentialParameter::default())),
+            _ => Err(format!("Unknown credential type: {}", s)),
         }
     }
 }
