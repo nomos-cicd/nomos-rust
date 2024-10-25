@@ -27,12 +27,6 @@ pub fn git_clone(
         let credential =
             Credential::get(credential_id.unwrap()).ok_or("Could not get credential")?;
         if let CredentialType::Ssh(ssh_credential) = credential.value {
-            // Workaround for local
-            execute_command(
-                &format!("git clone -b {} {}", branch, url),
-                directory.clone(),
-                job_result,
-            )?;
             let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
             let tmp_path = tmp_file.path();
             let _ = std::fs::write(tmp_path, ssh_credential.private_key);
