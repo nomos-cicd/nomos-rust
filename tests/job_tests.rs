@@ -17,6 +17,10 @@ fn read_yml() {
 
 #[tokio::test]
 async fn execute_job() {
+    do_execute_job().await;
+}
+
+async fn do_execute_job() -> String {
     let path_buf = PathBuf::from("tests/jobs/test-job.yml");
     let job = Job::try_from(path_buf).unwrap();
     let script = Script::try_from(PathBuf::from("tests/scripts/test-script.yml")).unwrap();
@@ -33,6 +37,28 @@ async fn execute_job() {
         assert!(step.is_started);
         assert!(step.finished_at > step.started_at);
     }
+
+    result.id
+}
+
+#[tokio::test]
+async fn job_result_id_test() {
+    let thread_1 = tokio::spawn(async { do_execute_job() });
+    let thread_2 = tokio::spawn(async { do_execute_job() });
+    let thread_3 = tokio::spawn(async { do_execute_job() });
+    let thread_4 = tokio::spawn(async { do_execute_job() });
+
+    let id_1 = thread_1.await.unwrap().await;
+    let id_2 = thread_2.await.unwrap().await;
+    let id_3 = thread_3.await.unwrap().await;
+    let id_4 = thread_4.await.unwrap().await;
+
+    assert_ne!(id_1, id_2);
+    assert_ne!(id_1, id_3);
+    assert_ne!(id_1, id_4);
+    assert_ne!(id_2, id_3);
+    assert_ne!(id_2, id_4);
+    assert_ne!(id_3, id_4);
 }
 
 #[tokio::test]

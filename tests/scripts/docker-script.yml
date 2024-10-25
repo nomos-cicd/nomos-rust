@@ -37,5 +37,6 @@ steps:
         image: $(parameters.docker_image)
         container: $(parameters.docker_image)
         args:
+          # - --restart unless-stopped
           - --env FOO=BAR
           - credential_variable: test-credential-array

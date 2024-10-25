@@ -4,7 +4,7 @@ use crate::{job::JobResult, utils::execute_command};
 
 /// docker run -d --restart unless-stopped {..args}
 pub fn docker_run(image: &str, args: Vec<&str>, directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
-    let mut command = vec!["docker", "run", "-d", "--restart", "unless-stopped"];
+    let mut command = vec!["docker", "run", "-d"];
     command.push(image);
     command.extend(args);
 

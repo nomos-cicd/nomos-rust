@@ -10,3 +10,11 @@ credentials:
     value:
       type: text
       value: val
+  - id: test-credential
+    value:
+      type: text
+      value: |
+        env1
+        env2
+        env3
+    read_only: false

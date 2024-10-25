@@ -451,15 +451,19 @@ async fn template_job_results() -> Html<String> {
     Html(template.render().unwrap())
 }
 
-async fn template_job_result(Path(id): Path<String>) -> Html<String> {
-    let result = JobResult::get(&id).unwrap();
+async fn template_job_result(Path(id): Path<String>) -> (StatusCode, Html<String>) {
+    let result = JobResult::get(&id);
+    if result.is_none() {
+        return (StatusCode::NOT_FOUND, Html("".to_string()));
+    }
+    let result = result.unwrap();
     let now = Utc::now();
     let template = JobResultTemplate {
         title: "Job Result",
         result: &result,
         now,
     };
-    Html(template.render().unwrap())
+    (StatusCode::OK, Html(template.render().unwrap()))
 }
 
 async fn template_job_result_logs(Path(result_id): Path<String>) -> Html<String> {
