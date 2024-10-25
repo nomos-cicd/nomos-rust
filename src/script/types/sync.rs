@@ -40,8 +40,10 @@ impl ScriptExecutor for SyncScript {
 
         let mut param_directory = PathBuf::from(param_directory_str);
 
-        if !param_directory.exists() {
-            return Err(format!("Directory does not exist: {:?}", param_directory));
+        if !job_result.dry_run {
+            if !param_directory.exists() {
+                return Err(format!("Directory does not exist: {:?}", param_directory));
+            }
         }
 
         if param_directory.is_relative() {

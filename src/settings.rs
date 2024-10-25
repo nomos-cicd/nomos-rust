@@ -56,6 +56,10 @@ impl TryFrom<PathBuf> for Settings {
 }
 
 pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
+    if job_result.dry_run {
+        job_result.add_log(LogLevel::Info, "Dry run enabled, skipping sync".to_string());
+        return Ok(());
+    }
     let settings_path = directory.join("settings.yml");
     let settings = Settings::try_from(settings_path).unwrap();
     settings.sync(job_result);
