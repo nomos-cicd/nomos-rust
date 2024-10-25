@@ -39,7 +39,7 @@ pub fn git_clone(
 
             let env = vec![(
                 "GIT_SSH_COMMAND".to_string(),
-                format!("ssh -i {}", tmp_path.display()),
+                format!("ssh -i {} -o StrictHostKeyChecking=no", tmp_path.display()),
             )];
             execute_command_with_env(
                 &format!("git clone -b {} {}", branch, url),
