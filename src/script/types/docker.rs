@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    docker::{docker_build, docker_stop_and_rm},
+    docker::{docker_build, docker_run, docker_stop_and_rm},
     job::JobResult,
     script::{utils::ParameterSubstitution, ScriptExecutor, ScriptParameterType},
 };
@@ -77,11 +77,84 @@ impl ScriptExecutor for DockerStopScript {
         job_result: &mut JobResult,
     ) -> Result<(), String> {
         // Get container name with parameter substitution
-        let container = self.container
+        let container = self
+            .container
             .substitute_parameters(parameters, false)?
             .ok_or("Container name is required")?;
 
         docker_stop_and_rm(&container, directory, job_result);
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(untagged)]
+pub enum DockerRunArg {
+    Direct(String),
+    EnvFromCredential { credential_variable: String },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+pub struct DockerRunScript {
+    pub image: String,
+    pub container: Option<String>,
+    pub args: Vec<DockerRunArg>,
+}
+
+impl ScriptExecutor for DockerRunScript {
+    fn execute(
+        &self,
+        parameters: &mut HashMap<String, ScriptParameterType>,
+        directory: PathBuf,
+        _step_name: &str,
+        job_result: &mut JobResult,
+    ) -> Result<(), String> {
+        // Get image name with parameter substitution
+        let image = self
+            .image
+            .substitute_parameters(parameters, false)?
+            .ok_or("Image name is required")?;
+
+        let mut final_args: Vec<String> = Vec::new();
+
+        // Add container name if specified
+        if let Some(container_name) = &self.container {
+            let name = container_name
+                .substitute_parameters(parameters, false)?
+                .ok_or("Container name substitution failed")?;
+            final_args.push("--name".to_string());
+            final_args.push(name);
+        }
+
+        // Process each argument
+        for arg in &self.args {
+            match arg {
+                DockerRunArg::Direct(arg_str) => {
+                    let processed_arg = arg_str
+                        .substitute_parameters(parameters, false)?
+                        .ok_or("Argument substitution failed")?;
+                    final_args.push(processed_arg);
+                }
+                DockerRunArg::EnvFromCredential { credential_variable } => {
+                    let param_key = format!("variables.{}", credential_variable);
+
+                    if let Some(ScriptParameterType::StringArray(arr)) = parameters.get(&param_key) {
+                        for arg in arr {
+                            final_args.push(format!("--env {}", arg));
+                        }
+                    } else {
+                        return Err(format!(
+                            "Cannot find saved array for credential {}",
+                            credential_variable
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Convert to &str for docker_run function
+        let args_ref: Vec<&str> = final_args.iter().map(|s| s.as_str()).collect();
+
+        docker_run(&image, args_ref, directory, job_result)
     }
 }

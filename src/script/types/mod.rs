@@ -1,6 +1,7 @@
 pub mod bash;
 pub mod docker;
 pub mod git;
+pub mod save;
 pub mod sync;
 
 pub use bash::BashScript;
@@ -18,10 +19,14 @@ pub enum ScriptType {
     GitClone(GitCloneScript),
     #[serde(rename = "sync")]
     Sync(SyncScript),
+    #[serde(rename = "save-as-array-from-credential")]
+    SaveAsArrayFromCredential(save::SaveAsArrayFromCredential),
     #[serde(rename = "docker-build")]
     DockerBuild(docker::DockerBuildScript),
     #[serde(rename = "docker-stop")]
     DockerStop(docker::DockerStopScript),
+    #[serde(rename = "docker-run")]
+    DockerRun(docker::DockerRunScript),
 }
 
 impl ScriptType {
@@ -31,8 +36,12 @@ impl ScriptType {
             "bash" => Ok(ScriptType::Bash(BashScript::default())),
             "git-clone" => Ok(ScriptType::GitClone(GitCloneScript::default())),
             "sync" => Ok(ScriptType::Sync(SyncScript::default())),
+            "save-as-array-from-credential" => Ok(ScriptType::SaveAsArrayFromCredential(
+                save::SaveAsArrayFromCredential::default(),
+            )),
             "docker-build" => Ok(ScriptType::DockerBuild(docker::DockerBuildScript::default())),
             "docker-stop" => Ok(ScriptType::DockerStop(docker::DockerStopScript::default())),
+            "docker-run" => Ok(ScriptType::DockerRun(docker::DockerRunScript::default())),
             _ => Err(format!("Unknown script type: {}", t)),
         }
     }

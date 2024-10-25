@@ -111,10 +111,11 @@
     </div>
 
     <script>
-        // Your existing JavaScript remains unchanged
+        // Returns JSON elements from form data. Checks if dot notation is used in the name attribute.
+        // E.g. { "name": "John Doe", "address": { "street": "123 Main St", "city": "Springfield" } }
         function getFormData(form) {
             const json = {};
-            for (const [key, value] of Object.entries(getFormEntries(form))) {
+            for (const [key, value] of getFormEntries(form)) {
                 const keys = key.split(".");
                 let ref = json;
                 for (let i = 0; i < keys.length; i++) {

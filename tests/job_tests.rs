@@ -61,7 +61,7 @@ async fn docker_job() {
     let result = JobResult::wait_for_completion(&result).await.unwrap();
     assert!(result.finished_at.is_some());
     assert!(result.is_success);
-    assert_eq!(result.steps.len(), 3);
+    assert_eq!(result.steps.len(), 4);
     for step in result.steps {
         assert!(step.is_success);
         assert!(step.is_started);

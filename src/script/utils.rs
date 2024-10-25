@@ -44,6 +44,7 @@ impl ParameterSubstitution for String {
                 ScriptParameterType::Password(p) => p.clone(),
                 ScriptParameterType::Boolean(b) => b.to_string(),
                 ScriptParameterType::Number(n) => n.to_string(),
+                ScriptParameterType::StringArray(a) => a.join(", "), // Not sure
             };
 
             result = result.replace(full_param_ref, &value);

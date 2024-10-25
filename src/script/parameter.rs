@@ -14,6 +14,8 @@ pub enum ScriptParameterType {
     Password(String),
     #[serde(rename = "credential")]
     Credential(String),
+    #[serde(rename = "string-array")]
+    StringArray(Vec<String>),
 }
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Default, JsonSchema, Debug)]
