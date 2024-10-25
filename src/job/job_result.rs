@@ -147,37 +147,24 @@ impl TryFrom<PathBuf> for JobResult {
     }
 }
 
-impl Default for JobResult {
-    fn default() -> Self {
+impl From<&Job> for JobResult {
+    fn from(job: &Job) -> Self {
         let id = next_job_result_id().unwrap();
-        let logger = JobLogger::new(id.clone(), id.clone()).unwrap();
-
-        eprintln!("JobResult ID: {}", id);
+        let steps: Vec<ScriptStep> = Script::get(&job.script_id)
+            .map(|script| script.steps.iter().map(ScriptStep::from).collect())
+            .unwrap();
+        let logger = JobLogger::new(job.id.clone(), id.clone()).unwrap();
         JobResult {
             id,
-            job_id: String::new(),
+            job_id: job.id.clone(),
+            steps: steps.clone(),
+            current_step_name: steps.first().map(|step| step.name.clone()),
             is_success: false,
-            steps: vec![],
-            current_step_name: None,
             started_at: Utc::now(),
             updated_at: Utc::now(),
             finished_at: None,
             logger,
             dry_run: false,
-        }
-    }
-}
-
-impl From<&Job> for JobResult {
-    fn from(job: &Job) -> Self {
-        let steps: Vec<ScriptStep> = Script::get(&job.script_id)
-            .map(|script| script.steps.iter().map(ScriptStep::from).collect())
-            .unwrap();
-        JobResult {
-            job_id: job.id.clone(),
-            steps: steps.clone(),
-            current_step_name: steps.first().map(|step| step.name.clone()),
-            ..Default::default()
         }
     }
 }
@@ -190,13 +177,18 @@ impl From<(&Job, &Script, bool)> for JobResult {
             "dry_run".to_string()
         };
         let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
+        let logger = JobLogger::new(job.id.clone(), id.clone()).unwrap();
         JobResult {
             id,
             job_id: job.id.clone(),
             steps: steps.clone(),
             current_step_name: steps.first().map(|step| step.name.clone()),
             dry_run: dry_mode,
-            ..Default::default()
+            is_success: false,
+            started_at: Utc::now(),
+            updated_at: Utc::now(),
+            finished_at: None,
+            logger,
         }
     }
 }

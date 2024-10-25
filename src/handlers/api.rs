@@ -149,6 +149,29 @@ pub async fn execute_job(
     (StatusCode::OK, result.unwrap())
 }
 
+pub async fn dry_run_job(headers: HeaderMap, body: String) -> (StatusCode, String) {
+    let content_type = headers.get("content-type");
+    if content_type.is_none() {
+        return (StatusCode::BAD_REQUEST, "Empty content-type".to_string());
+    }
+
+    let content_type = content_type.unwrap().to_str().unwrap();
+    if content_type != "application/yaml" {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Only application/yaml is supported".to_string(),
+        );
+    }
+
+    let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
+    let res = job.validate(None, Default::default());
+    if res.is_err() {
+        return (StatusCode::BAD_REQUEST, res.unwrap_err());
+    }
+
+    (StatusCode::OK, "".to_string())
+}
+
 pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode {
     let jobs = job::Job::get_all();
     if jobs.is_err() {

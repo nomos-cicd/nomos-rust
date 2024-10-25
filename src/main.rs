@@ -35,6 +35,7 @@ async fn main() {
         .route("/api/jobs", routing::post(create_job))
         .route("/api/jobs/:id", routing::delete(delete_job))
         .route("/api/jobs/:id/execute", routing::post(execute_job))
+        .route("/api/jobs/dry-run", routing::post(dry_run_job))
         .route("/api/job-trigger-types", routing::get(get_job_trigger_types))
         .route("/api/job-results", routing::get(get_job_results))
         .route("/api/job-results/:id", routing::get(get_job_result))

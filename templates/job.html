@@ -13,6 +13,10 @@
             <div class="uk-margin">
                 <button class="uk-button uk-button-primary">Submit</button>
             </div>
+
+            <div class="uk-margin">
+                <button type="button" class="uk-button uk-button-default" onclick="dryRun()">Dry Run</button>
+            </div>
         </fieldset>
     </form>
 </div>
@@ -37,6 +41,24 @@
     editor.onDidChangeModelContent(() => {
         document.querySelector('#job').value = editor.getValue();
     });
+
+    async function dryRun() {
+        const job = editor.getValue();
+        const response = await fetch('/api/jobs/dry-run', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/yaml'
+            },
+            body: job
+        });
+
+        const result = await response.text();
+        if (response.ok) {
+            alert("Success");
+        } else {
+            alert(`Error: ${result}`);
+        }
+    }
 </script>
 
 {% endblock %}

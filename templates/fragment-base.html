@@ -145,7 +145,7 @@
             submitString(event, getFormData(event.target));
         }
 
-        function submitString(event, cssSelector, contentType = "application/json") {
+        async function submitString(event, cssSelector, contentType = "application/json") {
             event.preventDefault();
             let content = null;
             if (typeof cssSelector === "string") {
@@ -159,20 +159,20 @@
                 return;
             }
 
-            fetch(event.target.action, {
+            const response = await fetch(event.target.action, {
                 method: event.target.method,
                 headers: {
                     "Content-Type": contentType,
                 },
                 body: contentType === "application/json" ? JSON.stringify(content) : content,
-            })
-                .then((response) => response.json())
-                .then((data) => {
-                    console.log(data);
-                })
-                .catch((error) => {
-                    console.error("Error:", error);
-                });
+            });
+            const data = await response.text();
+            console.log(data);
+            if (response.ok) {
+                alert("Success");
+            } else {
+                alert(`Error: ${result}`);
+            }
         }
     </script>
 </body>
