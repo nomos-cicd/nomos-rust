@@ -87,7 +87,7 @@ impl AuthnBackend for Backend {
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
         // Ok(self.users.get(user_id).cloned())
         return Ok(Some(Self::User {
-            id: user_id.clone(),
+            id: *user_id,
             username: "admin".to_string(),
             password: "admin".to_string(),
         }));

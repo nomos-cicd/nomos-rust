@@ -114,13 +114,16 @@ pub async fn create_job(headers: HeaderMap, body: String) -> (StatusCode, String
 
     let content_type = content_type.unwrap().to_str().unwrap();
     if content_type != "application/yaml" {
-        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported".to_string());
+        return (
+            StatusCode::BAD_REQUEST,
+            "Only application/yaml is supported".to_string(),
+        );
     }
 
     let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
     let res = job.sync(None);
-    if res.is_err() {
-        return (StatusCode::BAD_REQUEST, res.unwrap_err());
+    if let Err(err) = res {
+        return (StatusCode::BAD_REQUEST, err);
     }
     (StatusCode::CREATED, job.id)
 }
@@ -166,8 +169,8 @@ pub async fn dry_run_job(headers: HeaderMap, body: String) -> (StatusCode, Strin
 
     let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
     let res = job.validate(None, Default::default());
-    if res.is_err() {
-        return (StatusCode::BAD_REQUEST, res.unwrap_err());
+    if let Err(err) = res {
+        return (StatusCode::BAD_REQUEST, err);
     }
 
     (StatusCode::OK, "".to_string())

@@ -117,7 +117,7 @@ impl Credential {
         let existing_credential = Credential::get(self.id.as_str());
         if let Some(existing_credential) = existing_credential {
             let existing_type = existing_credential.get_credential_type();
-            if existing_type.to_string() != *current_type.to_string() {
+            if *existing_type != *current_type {
                 self.save();
                 if let Some(job_result) = job_result {
                     job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
