@@ -35,18 +35,18 @@ pub struct YamlScriptStep {
 
 impl Script {
     /// Reads as YamlScript and converts to Script. Primarily used before executing a job.
-    pub(crate) fn get(script_id: &str) -> Option<Self> {
-        let path = default_scripts_location().join(format!("{}.yml", script_id));
+    pub(crate) fn get(script_id: &str) -> Result<Option<Self>, String> {
+        let path = default_scripts_location()?.join(format!("{}.yml", script_id));
         if path.exists() {
-            let yaml_script = Script::try_from(path).ok()?;
-            Some(yaml_script)
+            let yaml_script = Script::try_from(path)?;
+            Ok(Some(yaml_script))
         } else {
-            None
+            Ok(None)
         }
     }
 
     pub fn get_all() -> Result<Vec<Self>, String> {
-        let scripts_path = default_scripts_location();
+        let scripts_path = default_scripts_location()?;
         let mut scripts = vec![];
         for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -58,12 +58,12 @@ impl Script {
     }
 
     /// Save as YamlScript. Primarily used after creating a new script.
-    pub fn sync(&self, job_result: Option<&mut JobResult>) {
-        let existing_script = Script::get(self.id.as_str());
+    pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
+        let existing_script = Script::get(self.id.as_str())?;
 
         if let Some(existing_script) = existing_script {
             if existing_script != *self {
-                self.save();
+                self.save()?;
                 if let Some(job_result) = job_result {
                     job_result.add_log(LogLevel::Info, format!("Updated script {:?}", self.id))
                 }
@@ -71,22 +71,24 @@ impl Script {
                 job_result.add_log(LogLevel::Info, format!("No changes in script {:?}", self.id))
             }
         } else {
-            self.save();
+            self.save()?;
             if let Some(job_result) = job_result {
                 job_result.add_log(LogLevel::Info, format!("Created script {:?}", self.id))
             }
         }
+
+        Ok(())
     }
 
-    fn save(&self) {
-        let path = default_scripts_location().join(format!("{}.yml", self.id));
-        let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
+    fn save(&self) -> Result<(), String> {
+        let path = default_scripts_location()?.join(format!("{}.yml", self.id));
+        let file = File::create(path).map_err(|e| e.to_string())?;
+        serde_yaml::to_writer(file, self).map_err(|e| e.to_string())
     }
 
-    pub fn delete(&self) {
-        let path = default_scripts_location().join(format!("{}.yml", self.id));
-        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
+    pub fn delete(&self) -> Result<(), String> {
+        let path = default_scripts_location()?.join(format!("{}.yml", self.id));
+        std::fs::remove_file(path).map_err(|e| e.to_string())
     }
 
     #[allow(dead_code)]

@@ -18,7 +18,11 @@ pub fn docker_build(
     directory: PathBuf,
     job_result: &mut JobResult,
 ) -> Result<(), String> {
-    let dockerfile_dir = dockerfile.parent().unwrap();
+    let dockerfile_dir = dockerfile.parent();
+    if dockerfile_dir.is_none() {
+        return Err("Dockerfile directory not found".to_string());
+    }
+    let dockerfile_dir = dockerfile_dir.unwrap();
     let command = format!(
         "docker build {} -t {} -f {}",
         dockerfile_dir.to_str().unwrap(),

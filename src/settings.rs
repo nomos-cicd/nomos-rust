@@ -15,7 +15,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn sync(&self, job_result: &mut JobResult) {
+    pub fn sync(&self, job_result: &mut JobResult) -> Result<(), String> {
         let mut credential_ids: Vec<String> = Vec::new();
         for yaml_credential in &self.credentials {
             let credential = Credential::try_from(yaml_credential);
@@ -32,16 +32,26 @@ impl Settings {
                 continue;
             }
 
-            credential.sync(job_result.into());
+            let res = credential.sync(job_result.into());
+            if let Err(e) = res {
+                job_result.add_log(LogLevel::Error, format!("Error syncing credential: {:?}", e));
+                continue;
+            }
             credential_ids.push(yaml_credential.id.clone());
         }
 
-        let credentials = Credential::get_all().unwrap();
+        let credentials = Credential::get_all()?;
         for credential in credentials {
             if !credential_ids.contains(&credential.id) && !credential.read_only {
-                credential.delete();
+                let res = credential.delete();
+                if let Err(e) = res {
+                    job_result.add_log(LogLevel::Error, format!("Error deleting credential: {:?}", e));
+                    continue;
+                }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -61,32 +71,50 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         return Ok(());
     }
     let settings_path = directory.join("settings.yml");
-    let settings = Settings::try_from(settings_path).unwrap();
-    settings.sync(job_result);
+    let settings = Settings::try_from(settings_path)?;
+    settings.sync(job_result)?;
 
     let mut script_ids: Vec<String> = Vec::new();
     let scripts_path = directory.join("scripts");
-    for entry in std::fs::read_dir(scripts_path).unwrap() {
-        let entry = entry.unwrap();
+    for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
-        let script = Script::try_from(path).unwrap();
-        script.sync(job_result.into());
+        let script = Script::try_from(path);
+        if let Err(e) = script {
+            job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
+            continue;
+        }
+        let script = script.unwrap();
+        let res = script.sync(job_result.into());
+        if let Err(e) = res {
+            job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
+            continue;
+        }
         script_ids.push(script.id.clone());
     }
-    let scripts = Script::get_all().unwrap();
+    let scripts = Script::get_all()?;
     for script in scripts {
         if !script_ids.contains(&script.id) {
-            script.delete();
+            let res = script.delete();
+            if let Err(e) = res {
+                job_result.add_log(LogLevel::Error, format!("Error deleting script: {:?}", e));
+                continue;
+            }
             job_result.add_log(LogLevel::Info, format!("Deleted script {:?}", script.id));
         }
     }
 
     let mut job_ids: Vec<String> = Vec::new();
     let jobs_path = directory.join("jobs");
-    for entry in std::fs::read_dir(jobs_path).unwrap() {
-        let entry = entry.unwrap();
+    for entry in std::fs::read_dir(jobs_path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
-        let job = Job::try_from(path).unwrap();
+        let job = Job::try_from(path);
+        if let Err(e) = job {
+            job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
+            continue;
+        }
+        let job = job.unwrap();
         if job.read_only {
             job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
             continue;
@@ -98,10 +126,14 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         }
         job_ids.push(job.id.clone());
     }
-    let jobs = Job::get_all().unwrap();
+    let jobs = Job::get_all()?;
     for job in jobs {
         if !job_ids.contains(&job.id) && !job.read_only {
-            job.delete();
+            let res = job.delete();
+            if let Err(e) = res {
+                job_result.add_log(LogLevel::Error, format!("Error deleting job: {:?}", e));
+                continue;
+            }
             job_result.add_log(LogLevel::Info, format!("Deleted job {:?}", job.id));
         }
     }

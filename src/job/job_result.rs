@@ -34,21 +34,23 @@ impl JobResult {
         }
     }
 
-    pub fn start_step(&mut self) {
+    pub fn start_step(&mut self) -> Result<(), String> {
         if let Some(_current_step) = &self.current_step_name {
             let current_step = self.get_current_step_mut();
             if let Some(current_step) = current_step {
                 current_step.start();
-                self.save();
+                self.save()?;
             } else {
-                panic!("No current step");
+                return Err("No current step".to_string());
             }
         } else {
-            panic!("No current step");
+            return Err("No current step".to_string());
         }
+
+        Ok(())
     }
 
-    pub fn finish_step(&mut self, is_success: bool) {
+    pub fn finish_step(&mut self, is_success: bool) -> Result<(), String> {
         let now: DateTime<Utc> = Utc::now();
         if let Some(current_step_name) = self.current_step_name.clone() {
             let current_step = self.get_current_step_mut();
@@ -61,8 +63,7 @@ impl JobResult {
                 self.is_success = false;
                 self.updated_at = now;
                 self.finished_at = Some(now);
-                self.save();
-                return;
+                self.save()?;
             }
 
             let index = self.steps.iter().position(|step| step.name == current_step_name);
@@ -75,11 +76,13 @@ impl JobResult {
                     self.updated_at = now;
                     self.finished_at = Some(now);
                 }
-                self.save();
+                self.save()?;
             }
         } else {
-            panic!("No current step");
+            return Err("No current step".to_string());
         }
+
+        Ok(())
     }
 
     pub fn add_log(&mut self, level: LogLevel, message: String) {
@@ -93,10 +96,10 @@ impl JobResult {
     }
 
     pub fn get_all(job_id: Option<String>) -> Result<Vec<Self>, String> {
-        let path = default_job_results_location();
+        let path = default_job_results_location()?;
         let mut job_results = Vec::new();
-        for entry in std::fs::read_dir(path).map_err(|e| e.to_string()).unwrap() {
-            let entry = entry.map_err(|e| e.to_string()).unwrap();
+        for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
             let mut path = entry.path();
             path.push("result.yml");
             let job_result =
@@ -113,33 +116,57 @@ impl JobResult {
         Ok(job_results)
     }
 
-    pub fn get(id: &str) -> Option<Self> {
-        let path = default_job_results_location().join(id).join("result.yml");
+    pub fn get(id: &str) -> Result<Option<Self>, String> {
+        let path = default_job_results_location()?.join(id).join("result.yml");
         if path.exists() {
-            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string()).ok()?;
-            serde_yaml::from_str(&content).map_err(|e| e.to_string()).ok()
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            serde_yaml::from_str(&content).map_err(|e| e.to_string())
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn save(&self) {
+    pub fn save(&self) -> Result<(), String> {
         if self.dry_run {
-            return;
+            return Ok(());
         }
-        let path = default_job_results_location().join(&self.id).join("result.yml");
-        let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
+        let path = default_job_results_location()?.join(&self.id).join("result.yml");
+        let file = File::create(path).map_err(|e| e.to_string())?;
+        serde_yaml::to_writer(file, self).map_err(|e| e.to_string())
     }
 
     #[allow(dead_code)]
     pub async fn wait_for_completion(id: &str) -> Result<Self, String> {
-        let mut job_result = JobResult::get(id).ok_or("Could not get job result")?;
+        let job_result = JobResult::get(id)?;
+        if job_result.is_none() {
+            return Err("Job result not found".to_string());
+        }
+        let mut job_result = job_result.unwrap();
         while job_result.finished_at.is_none() {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            job_result = JobResult::get(id).ok_or("Could not get job result")?;
+            let new_job_result = JobResult::get(id)?;
+            if new_job_result.is_none() {
+                return Err("Job result not found".to_string());
+            }
+            job_result = new_job_result.unwrap();
         }
         Ok(job_result)
+    }
+
+    /// Will fix later
+    pub fn create_dummy() -> Self {
+        JobResult {
+            id: "dummy".to_string(),
+            job_id: "dummy".to_string(),
+            is_success: false,
+            steps: vec![],
+            current_step_name: None,
+            started_at: Utc::now(),
+            updated_at: Utc::now(),
+            finished_at: None,
+            logger: JobLogger::new("dummy".to_string(), "dummy".to_string()).unwrap(),
+            dry_run: false,
+        }
     }
 }
 
@@ -153,14 +180,18 @@ impl TryFrom<PathBuf> for JobResult {
     }
 }
 
-impl From<&Job> for JobResult {
-    fn from(job: &Job) -> Self {
-        let id = next_job_result_id().unwrap();
-        let steps: Vec<ScriptStep> = Script::get(&job.script_id)
-            .map(|script| script.steps.iter().map(ScriptStep::from).collect())
-            .unwrap();
-        let logger = JobLogger::new(job.id.clone(), id.clone()).unwrap();
-        JobResult {
+impl TryFrom<&Job> for JobResult {
+    type Error = String;
+    fn try_from(job: &Job) -> Result<Self, Self::Error> {
+        let id = next_job_result_id().map_err(|e| e.to_string())?;
+        let script = Script::get(&job.script_id)?;
+        if script.is_none() {
+            return Err(format!("Script with id '{}' not found", job.script_id));
+        }
+        let script = script.unwrap();
+        let steps: Vec<ScriptStep> = script.steps.iter().map(|step| ScriptStep::from(step)).collect();
+        let logger = JobLogger::new(job.id.clone(), id.clone())?;
+        Ok(JobResult {
             id,
             job_id: job.id.clone(),
             steps: steps.clone(),
@@ -171,20 +202,21 @@ impl From<&Job> for JobResult {
             finished_at: None,
             logger,
             dry_run: false,
-        }
+        })
     }
 }
 
-impl From<(&Job, &Script, bool)> for JobResult {
-    fn from((job, script, dry_mode): (&Job, &Script, bool)) -> Self {
+impl TryFrom<(&Job, &Script, bool)> for JobResult {
+    type Error = String;
+    fn try_from((job, script, dry_mode): (&Job, &Script, bool)) -> Result<Self, Self::Error> {
         let id = if !dry_mode {
             next_job_result_id().unwrap()
         } else {
             "dry_run".to_string()
         };
         let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
-        let logger = JobLogger::new(job.id.clone(), id.clone()).unwrap();
-        JobResult {
+        let logger = JobLogger::new(job.id.clone(), id.clone())?;
+        Ok(JobResult {
             id,
             job_id: job.id.clone(),
             steps: steps.clone(),
@@ -195,6 +227,6 @@ impl From<(&Job, &Script, bool)> for JobResult {
             updated_at: Utc::now(),
             finished_at: None,
             logger,
-        }
+        })
     }
 }

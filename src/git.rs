@@ -24,8 +24,11 @@ pub fn git_clone(
         )?;
         Ok(())
     } else if credential_id.is_some() {
-        let credential =
-            Credential::get(credential_id.unwrap()).ok_or("Could not get credential")?;
+        let credential = Credential::get(credential_id.unwrap())?;
+        if credential.is_none() {
+            return Err(format!("Credential not found: {}", credential_id.unwrap()));
+        }
+        let credential = credential.unwrap();
         if let CredentialType::Ssh(ssh_credential) = credential.value {
             let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
             let tmp_path = tmp_file.path();

@@ -82,18 +82,20 @@ impl Default for Credential {
 }
 
 impl Credential {
-    pub fn get(credential_id: &str) -> Option<Self> {
-        let path = default_credentials_location().join(format!("{}.yml", credential_id));
+    pub fn get(credential_id: &str) -> Result<Option<Self>, String> {
+        let path = default_credentials_location()?.join(format!("{}.yml", credential_id));
         if path.exists() {
-            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string()).unwrap();
-            serde_yaml::from_str(&content).map_err(|e| e.to_string()).ok()
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            serde_yaml::from_str(&content)
+                .map_err(|e| e.to_string())
+                .map(|c| Some(c))
         } else {
-            None
+            Ok(None)
         }
     }
 
     pub fn get_all() -> Result<Vec<Self>, String> {
-        let path = default_credentials_location();
+        let path = default_credentials_location()?;
         let mut credentials = Vec::new();
         for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -112,13 +114,13 @@ impl Credential {
         }
     }
 
-    pub fn sync(&self, job_result: Option<&mut JobResult>) {
+    pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
         let current_type = self.get_credential_type();
-        let existing_credential = Credential::get(self.id.as_str());
+        let existing_credential = Credential::get(self.id.as_str())?;
         if let Some(existing_credential) = existing_credential {
             let existing_type = existing_credential.get_credential_type();
             if *existing_type != *current_type {
-                self.save();
+                self.save()?;
                 if let Some(job_result) = job_result {
                     job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
                 }
@@ -126,23 +128,25 @@ impl Credential {
                 job_result.add_log(LogLevel::Info, format!("No changes in credential {:?}", self.id))
             }
         } else {
-            self.save();
+            self.save()?;
             if let Some(job_result) = job_result {
                 job_result.add_log(LogLevel::Info, format!("Created credential {:?}", self.id))
             }
         }
+
+        Ok(())
     }
 
-    fn save(&self) {
-        let path = default_credentials_location().join(format!("{}.yml", self.id));
-        let file = std::fs::File::create(path).map_err(|e| e.to_string()).unwrap();
+    fn save(&self) -> Result<(), String> {
+        let path = default_credentials_location()?.join(format!("{}.yml", self.id));
+        let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
         let writer = std::io::BufWriter::new(file);
-        serde_yaml::to_writer(writer, self).map_err(|e| e.to_string()).unwrap();
+        serde_yaml::to_writer(writer, self).map_err(|e| e.to_string())
     }
 
-    pub fn delete(&self) {
-        let path = default_credentials_location().join(format!("{}.yml", self.id));
-        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
+    pub fn delete(&self) -> Result<(), String> {
+        let path = default_credentials_location()?.join(format!("{}.yml", self.id));
+        std::fs::remove_file(path).map_err(|e| e.to_string())
     }
 }
 
@@ -202,13 +206,13 @@ impl TryFrom<PathBuf> for Credential {
     }
 }
 
-pub fn default_credentials_location() -> PathBuf {
+pub fn default_credentials_location() -> Result<PathBuf, String> {
     let path = if cfg!(target_os = "windows") {
-        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string()).unwrap();
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string())?;
         PathBuf::from(appdata).join("nomos").join("credentials")
     } else {
         PathBuf::from("/var/lib/nomos/credentials")
     };
-    std::fs::create_dir_all(&path).map_err(|e| e.to_string()).unwrap();
-    path
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    Ok(path)
 }

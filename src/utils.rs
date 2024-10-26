@@ -4,8 +4,8 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-use sha2::Sha256;
 use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
 use crate::{job::JobResult, log::LogLevel};
 
@@ -65,8 +65,16 @@ pub fn execute_command_with_env(
 }
 
 pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<(), String> {
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
+    let stdout = child.stdout.take();
+    if stdout.is_none() {
+        return Err("Failed to open stdout".to_string());
+    }
+    let stdout = stdout.unwrap();
+    let stderr = child.stderr.take();
+    if stderr.is_none() {
+        return Err("Failed to open stderr".to_string());
+    }
+    let stderr = stderr.unwrap();
 
     let mut stdout_reader = BufReader::new(stdout);
     let mut stderr_reader = BufReader::new(stderr);

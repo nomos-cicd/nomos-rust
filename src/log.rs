@@ -39,7 +39,7 @@ pub struct JobLogger {
 
 impl JobLogger {
     pub fn new(job_id: String, result_id: String) -> Result<Self, String> {
-        let log_path = get_log_file_path(&job_id, &result_id);
+        let log_path = get_log_file_path(&job_id, &result_id)?;
 
         // Create directory if it doesn't exist
         if let Some(parent) = log_path.parent() {
@@ -78,7 +78,7 @@ impl JobLogger {
     }
 
     pub fn get_logs(&self) -> Result<Vec<Log>, String> {
-        let path = get_log_file_path(&self.job_id, &self.result_id);
+        let path = get_log_file_path(&self.job_id, &self.result_id)?;
         let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
 
         let logs = content
@@ -90,17 +90,17 @@ impl JobLogger {
     }
 }
 
-fn get_log_file_path(job_id: &str, result_id: &str) -> PathBuf {
+fn get_log_file_path(job_id: &str, result_id: &str) -> Result<PathBuf, String> {
     if cfg!(target_os = "windows") {
-        let appdata = std::env::var("APPDATA").unwrap();
-        PathBuf::from(appdata)
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string())?;
+        Ok(PathBuf::from(appdata)
             .join("nomos")
             .join("logs")
             .join(job_id)
-            .join(format!("{}.log", result_id))
+            .join(format!("{}.log", result_id)))
     } else {
-        PathBuf::from("/var/lib/nomos/logs")
+        Ok(PathBuf::from("/var/lib/nomos/logs")
             .join(job_id)
-            .join(format!("{}.log", result_id))
+            .join(format!("{}.log", result_id)))
     }
 }

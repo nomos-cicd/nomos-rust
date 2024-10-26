@@ -14,13 +14,20 @@ use crate::{
     utils::is_signature_valid,
 };
 
-pub async fn get_credentials() -> Json<Vec<credential::Credential>> {
-    let credentials = credential::Credential::get_all().unwrap();
-    Json(credentials)
+pub async fn get_credentials() -> (StatusCode, Json<Vec<credential::Credential>>) {
+    let credentials = credential::Credential::get_all();
+    if let Err(_) = credentials {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    (StatusCode::OK, Json(credentials.unwrap()))
 }
 
 pub async fn get_credential(Path(id): Path<String>) -> (StatusCode, Json<credential::Credential>) {
     let credential = credential::Credential::get(id.as_str());
+    if let Err(_) = credential {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    let credential = credential.unwrap();
     if credential.is_none() {
         return (StatusCode::NOT_FOUND, Json(Default::default()));
     }
@@ -28,18 +35,32 @@ pub async fn get_credential(Path(id): Path<String>) -> (StatusCode, Json<credent
     (StatusCode::OK, Json(credential.unwrap()))
 }
 
-pub async fn create_credential(Json(credential): Json<YamlCredential>) -> Json<credential::Credential> {
-    let credential = credential::Credential::try_from(credential).unwrap();
-    credential.sync(None);
-    Json(credential)
+pub async fn create_credential(Json(credential): Json<YamlCredential>) -> (StatusCode, Json<credential::Credential>) {
+    let credential = credential::Credential::try_from(credential);
+    if let Err(_) = credential {
+        return (StatusCode::BAD_REQUEST, Json(Default::default()));
+    }
+    let credential = credential.unwrap();
+    let res = credential.sync(None);
+    if let Err(_) = res {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    (StatusCode::CREATED, Json(credential))
 }
 
 pub async fn delete_credential(Path(id): Path<String>) -> StatusCode {
     let credential = credential::Credential::get(id.as_str());
+    if let Err(_) = credential {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+    let credential = credential.unwrap();
     if credential.is_none() {
         return StatusCode::NOT_FOUND;
     }
-    credential.unwrap().delete();
+    let res = credential.unwrap().delete();
+    if let Err(_) = res {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -48,13 +69,20 @@ pub async fn get_credential_types() -> Json<serde_json::Value> {
     Json(credential_types)
 }
 
-pub async fn get_scripts() -> Json<Vec<Script>> {
-    let scripts = Script::get_all().unwrap();
-    Json(scripts)
+pub async fn get_scripts() -> (StatusCode, Json<Vec<Script>>) {
+    let scripts = Script::get_all();
+    if let Err(_) = scripts {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    (StatusCode::OK, Json(scripts.unwrap()))
 }
 
 pub async fn get_script(Path(id): Path<String>) -> (StatusCode, Json<Script>) {
     let script = Script::get(id.as_str());
+    if let Err(_) = script {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    let script = script.unwrap();
     if script.is_none() {
         return (StatusCode::NOT_FOUND, Json(Default::default()));
     }
@@ -74,16 +102,26 @@ pub async fn create_script(headers: HeaderMap, body: String) -> (StatusCode, Jso
     }
 
     let script: Script = serde_yaml::from_str(body.as_str()).unwrap();
-    script.sync(None);
+    let res = script.sync(None);
+    if let Err(_) = res {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
     (StatusCode::CREATED, Json(script))
 }
 
 pub async fn delete_script(Path(id): Path<String>) -> StatusCode {
     let script = Script::get(id.as_str());
+    if let Err(_) = script {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+    let script = script.unwrap();
     if script.is_none() {
         return StatusCode::NOT_FOUND;
     }
-    script.unwrap().delete();
+    let res = script.unwrap().delete();
+    if let Err(_) = res {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -92,13 +130,20 @@ pub async fn get_script_parameter_types() -> Json<serde_json::Value> {
     Json(script_parameter_types)
 }
 
-pub async fn get_jobs() -> Json<Vec<job::Job>> {
-    let jobs = job::Job::get_all().unwrap();
-    Json(jobs)
+pub async fn get_jobs() -> (StatusCode, Json<Vec<job::Job>>) {
+    let jobs = job::Job::get_all();
+    if let Err(_) = jobs {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    (StatusCode::OK, Json(jobs.unwrap()))
 }
 
 pub async fn get_job(Path(id): Path<String>) -> (StatusCode, Json<job::Job>) {
     let job = job::Job::get(id.as_str());
+    if let Err(_) = job {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    let job = job.unwrap();
     if job.is_none() {
         return (StatusCode::NOT_FOUND, Json(Default::default()));
     }
@@ -130,10 +175,17 @@ pub async fn create_job(headers: HeaderMap, body: String) -> (StatusCode, String
 
 pub async fn delete_job(Path(id): Path<String>) -> StatusCode {
     let job = job::Job::get(id.as_str());
+    if let Err(_) = job {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+    let job = job.unwrap();
     if job.is_none() {
         return StatusCode::NOT_FOUND;
     }
-    job.unwrap().delete();
+    let res = job.unwrap().delete();
+    if let Err(_) = res {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -142,6 +194,10 @@ pub async fn execute_job(
     /*Json(parameters): Json<HashMap<String, ScriptParameterType>>,*/
 ) -> (StatusCode, String) {
     let job = job::Job::get(id.as_str());
+    if let Err(_) = job {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "".to_string());
+    }
+    let job = job.unwrap();
     if job.is_none() {
         return (StatusCode::NOT_FOUND, "".to_string());
     }
@@ -201,6 +257,11 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode
                     let payload = payload.unwrap();
 
                     let credential = credential::Credential::get(val.secret_credential_id.as_str());
+                    if credential.is_err() {
+                        eprintln!("Failed to get credential: {}", val.secret_credential_id);
+                        continue;
+                    }
+                    let credential = credential.unwrap();
                     if credential.is_none() {
                         eprintln!("Credential not found: {}", val.secret_credential_id);
                         continue;
@@ -263,12 +324,23 @@ pub struct JobResultsQuery {
     job_id: Option<String>,
 }
 
-pub async fn get_job_results(query: Query<JobResultsQuery>) -> Json<Vec<job::JobResult>> {
-    let job_results = job::JobResult::get_all(query.job_id.clone()).unwrap();
-    Json(job_results)
+pub async fn get_job_results(query: Query<JobResultsQuery>) -> (StatusCode, Json<Vec<job::JobResult>>) {
+    let job_results = job::JobResult::get_all(query.job_id.clone());
+    if let Err(_) = job_results {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
+    }
+    (StatusCode::OK, Json(job_results.unwrap()))
 }
 
-pub async fn get_job_result(Path(id): Path<String>) -> Json<job::JobResult> {
+pub async fn get_job_result(Path(id): Path<String>) -> (StatusCode, Json<job::JobResult>) {
     let job_result = job::JobResult::get(id.as_str());
-    Json(job_result.unwrap())
+    if let Err(_) = job_result {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(job::JobResult::create_dummy()));
+    }
+    let job_result = job_result.unwrap();
+    if job_result.is_none() {
+        return (StatusCode::NOT_FOUND, Json(job::JobResult::create_dummy()));
+    }
+
+    (StatusCode::OK, Json(job_result.unwrap()))
 }

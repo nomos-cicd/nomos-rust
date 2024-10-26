@@ -33,18 +33,18 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn get(id: &str) -> Option<Self> {
-        let path = default_jobs_location().join(format!("{}.yml", id));
+    pub fn get(id: &str) -> Result<Option<Self>, String> {
+        let path = default_jobs_location()?.join(format!("{}.yml", id));
         if path.exists() {
-            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string()).ok()?;
-            serde_yaml::from_str(&content).map_err(|e| e.to_string()).ok()
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            serde_yaml::from_str(&content).map_err(|e| e.to_string())
         } else {
-            None
+            Ok(None)
         }
     }
 
     pub fn get_all() -> Result<Vec<Self>, String> {
-        let path = default_jobs_location();
+        let path = default_jobs_location()?;
         let mut jobs = Vec::new();
         for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -58,14 +58,14 @@ impl Job {
     pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
         self.validate(None, Default::default())?;
 
-        let existing_job = Job::get(self.id.as_str());
+        let existing_job = Job::get(self.id.as_str())?;
         if let Some(existing_job) = existing_job {
             if existing_job.name != self.name
                 || existing_job.parameters != self.parameters
                 || existing_job.triggers != self.triggers
                 || existing_job.script_id != self.script_id
             {
-                self.save();
+                self.save()?;
                 if let Some(job_result) = job_result {
                     job_result.add_log(LogLevel::Info, format!("Updated job {:?}", self.id))
                 }
@@ -73,7 +73,7 @@ impl Job {
                 job_result.add_log(LogLevel::Info, format!("No changes in job {:?}", self.id))
             }
         } else {
-            self.save();
+            self.save()?;
             if let Some(job_result) = job_result {
                 job_result.add_log(LogLevel::Info, format!("Created job {:?}", self.id))
             }
@@ -82,19 +82,19 @@ impl Job {
         Ok(())
     }
 
-    fn save(&self) {
-        let path = default_jobs_location().join(format!("{}.yml", self.id));
-        let file = File::create(path).map_err(|e| e.to_string()).unwrap();
-        serde_yaml::to_writer(file, self).map_err(|e| e.to_string()).unwrap();
+    fn save(&self) -> Result<(), String> {
+        let path = default_jobs_location()?.join(format!("{}.yml", self.id));
+        let file = File::create(path).map_err(|e| e.to_string())?;
+        serde_yaml::to_writer(file, self).map_err(|e| e.to_string())
     }
 
-    pub fn delete(&self) {
+    pub fn delete(&self) -> Result<(), String> {
         let path = PathBuf::from("jobs").join(format!("{}.yml", self.id));
-        std::fs::remove_file(path).map_err(|e| e.to_string()).unwrap();
+        std::fs::remove_file(path).map_err(|e| e.to_string())
     }
 
     pub fn execute(&self, parameters: HashMap<String, ScriptParameterType>) -> Result<String, String> {
-        let script = Script::get(&self.script_id).ok_or("Could not get script")?;
+        let script = Script::get(&self.script_id)?.ok_or("Could not get script")?;
         self.execute_with_script(parameters, &script)
     }
 
@@ -107,11 +107,11 @@ impl Job {
 
         let mut merged_parameters = self.merged_parameters(Some(script), parameters.clone())?;
 
-        let mut job_result = JobResult::from((self, script, false));
+        let mut job_result = JobResult::try_from((self, script, false))?;
         let id = job_result.id.clone();
-        let directory = default_job_results_location().join(&job_result.id);
+        let directory = default_job_results_location()?.join(&job_result.id);
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        job_result.save();
+        job_result.save()?;
 
         tokio::spawn(async move {
             let _ = Job::execute_job_result(&mut job_result, directory, &mut merged_parameters);
@@ -140,18 +140,27 @@ impl Job {
             if result.is_err() {
                 let message = format!("Error in step {}: {:?}", step_name, result.err().unwrap());
                 job_result.add_log(LogLevel::Error, message.clone());
-                job_result.finish_step(false);
+                let _ = job_result.finish_step(false); // No need to catch, we already have an error
                 is_success = false;
                 if job_result.dry_run {
                     return Err(message.clone());
                 }
                 break;
             }
-            job_result.finish_step(true);
+            let res = job_result.finish_step(true);
+            if res.is_err() {
+                let message = format!("Error finishing step {}: {:?}", step_name, res.err().unwrap());
+                job_result.add_log(LogLevel::Error, message.clone());
+                is_success = false;
+                if job_result.dry_run {
+                    return Err(message.clone());
+                }
+                break;
+            }
         }
 
         job_result.is_success = is_success;
-        job_result.save();
+        job_result.save()?;
 
         Ok(())
     }
@@ -169,7 +178,7 @@ impl Job {
         let script_opt: Option<Script> = match script {
             Some(script) => Some(script.clone()),
             None => {
-                let self_script = Script::get(&self.script_id).ok_or("Could not get script")?;
+                let self_script = Script::get(&self.script_id)?.ok_or("Could not get script")?;
                 Some(self_script.clone())
             }
         };
@@ -202,7 +211,7 @@ impl Job {
         let script_opt: Option<Script> = match script {
             Some(script) => Some(script.clone()),
             None => {
-                let self_script = Script::get(&self.script_id).ok_or("Could not get script")?;
+                let self_script = Script::get(&self.script_id)?.ok_or("Could not get script")?;
                 Some(self_script.clone())
             }
         };
@@ -241,7 +250,7 @@ impl Job {
         let script_opt: Option<Script> = match script {
             Some(script) => Some(script.clone()),
             None => {
-                let self_script = Script::get(&self.script_id).ok_or("Could not get script")?;
+                let self_script = Script::get(&self.script_id)?.ok_or("Could not get script")?;
                 Some(self_script.clone())
             }
         };
@@ -249,7 +258,7 @@ impl Job {
 
         let directory = PathBuf::from("tmp");
         Job::execute_job_result(
-            &mut JobResult::from((self, &script, true)),
+            &mut JobResult::try_from((self, &script, true))?,
             directory,
             &mut merged_parameters,
         )

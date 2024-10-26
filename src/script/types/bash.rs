@@ -26,7 +26,11 @@ impl ScriptExecutor for BashScript {
         job_result: &mut JobResult,
     ) -> Result<(), String> {
         // Replace all parameter references in the code
-        let replaced_code = self.code.substitute_parameters(parameters, false)?.unwrap();
+        let replaced_code = self.code.substitute_parameters(parameters, false)?;
+        if replaced_code.is_none() {
+            return Ok(());
+        }
+        let replaced_code = replaced_code.unwrap();
         let replaced_code = match replaced_code {
             SubstitutionResult::Single(s) => s,
             SubstitutionResult::Multiple(_) => {

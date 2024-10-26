@@ -9,26 +9,26 @@ use std::{
 
 use super::JobResult;
 
-pub fn default_job_results_location() -> PathBuf {
+pub fn default_job_results_location() -> Result<PathBuf, String> {
     let path = if cfg!(target_os = "windows") {
-        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string()).unwrap();
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string())?;
         PathBuf::from(appdata).join("nomos").join("job_results")
     } else {
         PathBuf::from("/var/lib/nomos/job_results")
     };
-    std::fs::create_dir_all(&path).map_err(|e| e.to_string()).unwrap();
-    path
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    Ok(path)
 }
 
-pub fn default_jobs_location() -> PathBuf {
+pub fn default_jobs_location() -> Result<PathBuf, String> {
     let path = if cfg!(target_os = "windows") {
-        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string()).unwrap();
+        let appdata = std::env::var("APPDATA").map_err(|e| e.to_string())?;
         PathBuf::from(appdata).join("nomos").join("jobs")
     } else {
         PathBuf::from("/var/lib/nomos/jobs")
     };
-    std::fs::create_dir_all(&path).map_err(|e| e.to_string()).unwrap();
-    path
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    Ok(path)
 }
 
 static JOB_RESULTS: Lazy<Arc<Mutex<File>>> = Lazy::new(|| {
@@ -74,7 +74,7 @@ pub fn next_job_result_id() -> Result<String, Box<dyn Error>> {
     let id = content.trim().parse::<u64>().unwrap_or(0);
 
     let mut next_id = id + 1;
-    while JobResult::get(&next_id.to_string()).is_some() {
+    while JobResult::get(&next_id.to_string())?.is_some() {
         next_id += 1;
     }
 
