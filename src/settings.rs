@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 use crate::{
-    credential::{Credential, YamlCredential},
+    credential::Credential,
     job::{Job, JobResult},
     log::LogLevel,
     script::models::Script,
@@ -11,19 +11,13 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub credentials: Vec<YamlCredential>,
+    pub credentials: Vec<Credential>,
 }
 
 impl Settings {
     pub fn sync(&self, job_result: &mut JobResult) -> Result<(), String> {
         let mut credential_ids: Vec<String> = Vec::new();
-        for yaml_credential in &self.credentials {
-            let credential = Credential::try_from(yaml_credential);
-            if let Err(e) = credential {
-                job_result.add_log(LogLevel::Error, format!("Error syncing credential: {:?}", e));
-                continue;
-            }
-            let credential = credential.unwrap();
+        for credential in &self.credentials {
             if credential.read_only {
                 job_result.add_log(
                     LogLevel::Info,
@@ -37,7 +31,7 @@ impl Settings {
                 job_result.add_log(LogLevel::Error, format!("Error syncing credential: {:?}", e));
                 continue;
             }
-            credential_ids.push(yaml_credential.id.clone());
+            credential_ids.push(credential.id.clone());
         }
 
         let credentials = Credential::get_all()?;

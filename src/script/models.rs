@@ -8,7 +8,7 @@ use crate::{job::JobResult, log::LogLevel};
 
 use super::{default_scripts_location, types::ScriptType, ScriptParameter};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, JsonSchema)]
 pub struct Script {
     pub id: String,
     pub name: String,
@@ -51,8 +51,12 @@ impl Script {
         for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path: PathBuf = entry.path();
-            let script = Script::try_from(path)?;
-            scripts.push(script);
+            let script = Script::try_from(path);
+            if let Err(e) = script {
+                eprintln!("Error reading script: {:?}", e);
+                continue;
+            }
+            scripts.push(script.unwrap());
         }
         Ok(scripts)
     }
@@ -92,9 +96,9 @@ impl Script {
     }
 
     #[allow(dead_code)]
-    pub fn get_json_schema() -> serde_json::Value {
+    pub fn get_json_schema() -> Result<serde_json::Value, String> {
         let schema = schema_for!(Script);
-        serde_json::to_value(schema).unwrap()
+        serde_json::to_value(schema).map_err(|e| e.to_string())
     }
 }
 

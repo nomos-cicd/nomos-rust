@@ -32,9 +32,9 @@ pub enum TriggerType {
 }
 
 impl TriggerType {
-    pub fn get_json_schema() -> serde_json::Value {
+    pub fn get_json_schema() -> Result<serde_json::Value, String> {
         let schema = schema_for!(TriggerType);
-        serde_json::to_value(schema).unwrap()
+        serde_json::to_value(schema).map_err(|e| e.to_string())
     }
 }
 

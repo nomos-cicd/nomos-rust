@@ -1,6 +1,5 @@
 use std::{path::PathBuf, str::FromStr};
 
-use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -35,9 +34,9 @@ pub enum CredentialType {
 }
 
 impl CredentialType {
-    pub fn get_json_schema() -> serde_json::Value {
+    pub fn get_json_schema() -> Result<serde_json::Value, String> {
         let schema = schemars::schema_for!(CredentialType);
-        serde_json::to_value(schema).unwrap()
+        serde_json::to_value(schema).map_err(|e| e.to_string())
     }
 }
 
@@ -59,8 +58,6 @@ pub struct Credential {
     pub id: String,
     pub value: CredentialType,
     pub read_only: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 impl PartialEq for Credential {
@@ -69,50 +66,33 @@ impl PartialEq for Credential {
     }
 }
 
-impl Default for Credential {
-    fn default() -> Self {
-        Credential {
-            id: String::new(),
-            value: CredentialType::Text(TextCredentialParameter { value: String::new() }),
-            read_only: false,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
-    }
-}
-
 impl Credential {
     pub fn get(credential_id: &str, job_result: Option<&mut JobResult>) -> Result<Option<Self>, String> {
         let path = default_credentials_location()?.join(format!("{}.yml", credential_id));
-        if path.exists() {
-            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            let res: Result<Option<Self>, String> = serde_yaml::from_str(&content).map_err(|e| e.to_string()).map(Some);
+        let credential = Credential::try_from(path.clone());
+        if credential.is_ok() {
+            let credential = credential.unwrap();
             if let Some(job_result) = job_result {
-                if let Ok(Some(mut res)) = res.clone() {
-                    match res.value {
-                        CredentialType::Text(ref mut text) => {
-                            if text.value.is_empty() {
-                                job_result
-                                    .add_log(LogLevel::Warning, format!("Empty text credential: {}", credential_id));
-                            }
+                match credential.clone().value {
+                    CredentialType::Text(text) => {
+                        if text.value.is_empty() {
+                            job_result.add_log(LogLevel::Warning, format!("Empty text credential: {}", credential_id));
                         }
-                        CredentialType::Env(ref mut env) => {
-                            if env.value.is_empty() {
-                                job_result
-                                    .add_log(LogLevel::Warning, format!("Empty env credential: {}", credential_id));
-                            }
+                    }
+                    CredentialType::Env(env) => {
+                        if env.value.is_empty() {
+                            job_result.add_log(LogLevel::Warning, format!("Empty env credential: {}", credential_id));
                         }
-                        CredentialType::Ssh(ref mut ssh) => {
-                            if ssh.username.is_empty() || ssh.private_key.is_empty() {
-                                job_result
-                                    .add_log(LogLevel::Warning, format!("Empty ssh credential: {}", credential_id));
-                            }
+                    }
+                    CredentialType::Ssh(ssh) => {
+                        if ssh.username.is_empty() || ssh.private_key.is_empty() {
+                            job_result.add_log(LogLevel::Warning, format!("Empty ssh credential: {}", credential_id));
                         }
                     }
                 }
             }
 
-            res
+            Ok(Some(credential))
         } else {
             Ok(None)
         }
@@ -124,8 +104,12 @@ impl Credential {
         for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let credential = Credential::try_from(path).map_err(|e| e.to_string())?;
-            credentials.push(credential);
+            let credential = Credential::try_from(path).map_err(|e| e.to_string());
+            if let Err(e) = credential {
+                eprintln!("Error reading credential: {:?}", e);
+                continue;
+            }
+            credentials.push(credential.unwrap());
         }
         Ok(credentials)
     }
@@ -180,59 +164,12 @@ impl Credential {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct YamlCredential {
-    pub id: String,
-    pub read_only: bool,
-    pub value: CredentialType,
-}
-
-impl TryFrom<YamlCredential> for Credential {
-    type Error = String;
-
-    fn try_from(value: YamlCredential) -> Result<Self, Self::Error> {
-        Ok(Credential {
-            id: value.id,
-            value: value.value,
-            read_only: value.read_only,
-            ..Default::default()
-        })
-    }
-}
-
-impl TryFrom<&YamlCredential> for Credential {
-    type Error = String;
-
-    fn try_from(value: &YamlCredential) -> Result<Self, Self::Error> {
-        Ok(Credential {
-            id: value.id.clone(),
-            value: value.value.clone(),
-            read_only: value.read_only,
-            ..Default::default()
-        })
-    }
-}
-
-impl TryFrom<PathBuf> for YamlCredential {
-    type Error = String;
-
-    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let file = std::fs::File::open(path).map_err(|_| "Could not open file")?;
-        let reader = std::io::BufReader::new(file);
-        let yaml: serde_yaml::Value = serde_yaml::from_reader(reader).map_err(|e| e.to_string())?;
-
-        let yaml_credential: YamlCredential = serde_yaml::from_value(yaml).map_err(|e| e.to_string())?;
-
-        Ok(yaml_credential)
-    }
-}
-
 impl TryFrom<PathBuf> for Credential {
     type Error = String;
 
     fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        let yaml_credential = YamlCredential::try_from(path)?;
-        Credential::try_from(yaml_credential)
+        let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        serde_yaml::from_str(&content).map_err(|e| e.to_string())
     }
 }
 

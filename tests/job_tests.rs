@@ -106,7 +106,9 @@ fn validation() {
                 code: "echo $(missing.param)".to_string(),
             })],
         }],
-        ..Default::default()
+        id: "test-script".to_string(),
+        name: "Test Script".to_string(),
+        parameters: vec![],
     };
     let job = Job {
         id: "test-job".to_string(),

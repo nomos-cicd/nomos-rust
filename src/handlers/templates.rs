@@ -78,7 +78,11 @@ struct CredentialsTemplate<'a> {
 }
 
 pub async fn template_credentials() -> Html<String> {
-    let credentials = Credential::get_all().unwrap();
+    let credentials = Credential::get_all();
+    if let Err(e) = credentials {
+        return Html(e.to_string());
+    }
+    let credentials = credentials.unwrap();
     let template = CredentialsTemplate {
         title: "Credentials",
         credentials,
@@ -257,7 +261,11 @@ pub struct JobFormQuery {
 }
 
 pub async fn template_jobs() -> Html<String> {
-    let jobs = job::Job::get_all().unwrap();
+    let jobs = job::Job::get_all();
+    if let Err(e) = jobs {
+        return Html(e.to_string());
+    }
+    let jobs = jobs.unwrap();
     let template = JobsTemplate { title: "Jobs", jobs };
     Html(template.render().unwrap())
 }
@@ -372,7 +380,11 @@ struct JobResultStepsTemplate<'a> {
 }
 
 pub async fn template_job_results(query: Query<JobResultsQuery>) -> Html<String> {
-    let results = JobResult::get_all(query.job_id.clone()).unwrap();
+    let results = JobResult::get_all(query.job_id.clone());
+    if let Err(e) = results {
+        return Html(e.to_string());
+    }
+    let results = results.unwrap();
     let has_in_progress = results.iter().any(|r| r.finished_at.is_none());
 
     let template = JobResultsTemplate {
@@ -384,7 +396,11 @@ pub async fn template_job_results(query: Query<JobResultsQuery>) -> Html<String>
 }
 
 pub async fn template_job_results_table(query: Query<JobResultsQuery>) -> Html<String> {
-    let results = JobResult::get_all(query.job_id.clone()).unwrap();
+    let results = JobResult::get_all(query.job_id.clone());
+    if let Err(e) = results {
+        return Html(e.to_string());
+    }
+    let results = results.unwrap();
     let template = JobResultsTableTemplate { results };
     Html(template.render().unwrap())
 }

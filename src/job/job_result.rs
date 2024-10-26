@@ -109,8 +109,12 @@ impl JobResult {
             let entry = entry.map_err(|e| e.to_string())?;
             let mut path = entry.path();
             path.push("result.yml");
-            let job_result =
-                JobResult::try_from(path.clone()).map_err(|e| format!("Path: {:?}, Error: {:?}", path, e))?;
+            let job_result = JobResult::try_from(path.clone()).map_err(|e| format!("Path: {:?}, Error: {:?}", path, e));
+            if let Err(e) = job_result {
+                eprintln!("Error reading job result: {:?}", e);
+                continue;
+            }
+            let job_result = job_result.unwrap();
             if let Some(job_id) = job_id.clone() {
                 if job_result.job_id == job_id {
                     job_results.push(job_result);

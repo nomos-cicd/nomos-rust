@@ -22,7 +22,7 @@ pub struct JobParameterDefinition {
     pub default: Option<ScriptParameterType>,
 }
 
-#[derive(Deserialize, Serialize, Default, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug)]
 pub struct Job {
     pub id: String,
     pub name: String,
@@ -49,8 +49,12 @@ impl Job {
         for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let job = Job::try_from(path).map_err(|e| e.to_string())?;
-            jobs.push(job);
+            let job = Job::try_from(path).map_err(|e| e.to_string());
+            if let Err(e) = job {
+                eprintln!("Error reading job: {:?}", e);
+                continue;
+            }
+            jobs.push(job.unwrap());
         }
         Ok(jobs)
     }
