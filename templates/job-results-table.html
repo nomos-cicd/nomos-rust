@@ -1,0 +1,93 @@
+<table class="uk-table uk-table-middle uk-table-divider uk-table-hover">
+    <thead>
+        <tr>
+            <th></th>
+            <th>ID</th>
+            <th>Job</th>
+            <th>Status</th>
+            <th>Started At</th>
+            <th>Updated At</th>
+            <th>Finished At</th>
+            <th class="uk-text-center">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for result in results %}
+        <tr>
+            <td>
+                <button class="uk-button uk-button-small uk-button-default" uk-toggle="target: #steps-{{ result.id }}">
+                    ▼
+                </button>
+            </td>
+            <td class="uk-text-truncate" style="max-width: 150px;">{{ result.id }}</td>
+            <td>{{ result.job_id }}</td>
+            <td>
+                {% if result.finished_at.is_some() %}
+                {% if result.is_success %}
+                <span class="uk-label uk-label-success">Success</span>
+                {% else %}
+                <span class="uk-label uk-label-danger">Failed</span>
+                {% endif %}
+                {% else %}
+                <span class="uk-label">In Progress</span>
+                {% endif %}
+            </td>
+            <td>{{ result.started_at }}</td>
+            <td>{{ result.updated_at }}</td>
+            <td>
+                {% if result.finished_at.is_some() %}
+                {{ result.finished_at.unwrap() }}
+                {% endif %}
+            </td>
+            <td>
+                <div class="uk-flex uk-flex-center uk-flex-middle">
+                    <a href="/job-results/{{ result.id }}" class="uk-button uk-button-small uk-button-default"
+                        uk-tooltip="View Details">
+                        View
+                    </a>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="8" class="uk-padding-remove">
+                <div id="steps-{{ result.id }}" class="uk-padding-small uk-background-secondary" hidden>
+                    <ul class="uk-list uk-list-divider uk-margin-remove uk-padding-remove">
+                        {% for step in result.steps %}
+                        <li>
+                            <div class="uk-grid-small uk-flex-middle" uk-grid>
+                                <div class="uk-width-auto">
+                                    {% if step.is_finished %}
+                                    {% if step.is_success %}
+                                    <span style="color: green;">✓</span>
+                                    {% else %}
+                                    <span style="color: red;">✗</span>
+                                    {% endif %}
+                                    {% else %}
+                                    {% if step.is_started %}
+                                    <div uk-spinner></div>
+                                    {% else %}
+                                    <span>⏱</span>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="uk-width-expand">
+                                    <h4 class="uk-margin-remove">{{ step.name }}</h4>
+                                    {% if step.is_started %}
+                                    <p class="uk-text-small uk-text-muted uk-margin-remove">
+                                        Started: {{ step.started_at }}
+                                        {% if step.is_finished %}
+                                        | Finished: {{ step.finished_at }}
+                                        {% endif %}
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

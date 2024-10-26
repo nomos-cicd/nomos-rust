@@ -322,7 +322,14 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
 #[derive(Template)]
 #[template(path = "job-results.html")]
 struct JobResultsTemplate<'a> {
-    title: &'a str,
+    title: String,
+    has_in_progress: bool,
+    job_id_filter: Option<&'a str>,
+}
+
+#[derive(Template)]
+#[template(path = "job-results-table.html")]
+struct JobResultsTableTemplate {
     results: Vec<JobResult>,
 }
 
@@ -367,10 +374,19 @@ struct JobResultStepsTemplate<'a> {
 
 pub async fn template_job_results(query: Query<JobResultsQuery>) -> Html<String> {
     let results = JobResult::get_all(query.job_id.clone()).unwrap();
+    let has_in_progress = results.iter().any(|r| r.finished_at.is_none());
+
     let template = JobResultsTemplate {
-        title: "Job Results",
-        results,
+        title: "Job Results".to_string(),
+        has_in_progress,
+        job_id_filter: query.job_id.as_deref(),
     };
+    Html(template.render().unwrap())
+}
+
+pub async fn template_job_results_table(query: Query<JobResultsQuery>) -> Html<String> {
+    let results = JobResult::get_all(query.job_id.clone()).unwrap();
+    let template = JobResultsTableTemplate { results };
     Html(template.render().unwrap())
 }
 

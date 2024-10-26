@@ -78,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/jobs/create", routing::get(template_create_job))
         .route("/jobs/:id", routing::get(template_update_job))
         .route("/job-results", routing::get(template_job_results))
+        .route("/job-results/table", routing::get(template_job_results_table))
         .route("/job-results/:id", routing::get(template_job_result))
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
         .route("/job-results/:id/header", routing::get(template_job_result_header))
