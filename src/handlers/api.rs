@@ -23,7 +23,7 @@ pub async fn get_credentials() -> (StatusCode, Json<Vec<credential::Credential>>
 }
 
 pub async fn get_credential(Path(id): Path<String>) -> (StatusCode, Json<credential::Credential>) {
-    let credential = credential::Credential::get(id.as_str());
+    let credential = credential::Credential::get(id.as_str(), &None);
     if credential.is_err() {
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
     }
@@ -41,7 +41,7 @@ pub async fn create_credential(Json(credential): Json<YamlCredential>) -> (Statu
         return (StatusCode::BAD_REQUEST, Json(Default::default()));
     }
     let credential = credential.unwrap();
-    let res = credential.sync(None);
+    let res = credential.sync(&None);
     if res.is_err() {
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(Default::default()));
     }
@@ -49,7 +49,7 @@ pub async fn create_credential(Json(credential): Json<YamlCredential>) -> (Statu
 }
 
 pub async fn delete_credential(Path(id): Path<String>) -> StatusCode {
-    let credential = credential::Credential::get(id.as_str());
+    let credential = credential::Credential::get(id.as_str(), &None);
     if credential.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
@@ -256,7 +256,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode
                     }
                     let payload = payload.unwrap();
 
-                    let credential = credential::Credential::get(val.secret_credential_id.as_str());
+                    let credential = credential::Credential::get(val.secret_credential_id.as_str(), &None);
                     if credential.is_err() {
                         eprintln!("Failed to get credential: {}", val.secret_credential_id);
                         continue;

@@ -24,7 +24,7 @@ pub fn git_clone(
         )?;
         Ok(())
     } else if credential_id.is_some() {
-        let credential = Credential::get(credential_id.unwrap())?;
+        let credential = Credential::get(credential_id.unwrap(), &Some(job_result))?;
         if credential.is_none() {
             return Err(format!("Credential not found: {}", credential_id.unwrap()));
         }

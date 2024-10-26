@@ -104,7 +104,7 @@ pub async fn template_create_credential() -> Html<String> {
 
 pub async fn template_credential(id: Option<Path<String>>, title: &str) -> Html<String> {
     let credential = if let Some(id) = id {
-        Credential::get(id.as_str())
+        Credential::get(id.as_str(), &None)
     } else {
         Ok(None)
     };
@@ -143,7 +143,7 @@ pub struct CredentialValueQuery {
 
 pub async fn template_credential_value(params: Query<CredentialValueQuery>) -> (StatusCode, Html<String>) {
     if let Some(id) = &params.id {
-        let credential = Credential::get(id.as_str());
+        let credential = Credential::get(id.as_str(), &None);
         if let Err(e) = credential {
             return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
         }

@@ -32,7 +32,7 @@ impl Settings {
                 continue;
             }
 
-            let res = credential.sync(job_result.into());
+            let res = credential.sync(&job_result.into());
             if let Err(e) = res {
                 job_result.add_log(LogLevel::Error, format!("Error syncing credential: {:?}", e));
                 continue;

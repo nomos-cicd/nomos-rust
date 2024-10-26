@@ -82,11 +82,37 @@ impl Default for Credential {
 }
 
 impl Credential {
-    pub fn get(credential_id: &str) -> Result<Option<Self>, String> {
+    pub fn get(credential_id: &str, job_result: &Option<&mut JobResult>) -> Result<Option<Self>, String> {
         let path = default_credentials_location()?.join(format!("{}.yml", credential_id));
         if path.exists() {
             let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            serde_yaml::from_str(&content).map_err(|e| e.to_string()).map(Some)
+            let res: Result<Option<Self>, String> = serde_yaml::from_str(&content).map_err(|e| e.to_string()).map(Some);
+            if let Some(job_result) = job_result {
+                if let Ok(Some(mut res)) = res.clone() {
+                    match res.value {
+                        CredentialType::Text(ref mut text) => {
+                            if text.value.is_empty() {
+                                job_result
+                                    .add_log(LogLevel::Warning, format!("Empty text credential: {}", credential_id));
+                            }
+                        }
+                        CredentialType::Env(ref mut env) => {
+                            if env.value.is_empty() {
+                                job_result
+                                    .add_log(LogLevel::Warning, format!("Empty env credential: {}", credential_id));
+                            }
+                        }
+                        CredentialType::Ssh(ref mut ssh) => {
+                            if ssh.username.is_empty() || ssh.private_key.is_empty() {
+                                job_result
+                                    .add_log(LogLevel::Warning, format!("Empty ssh credential: {}", credential_id));
+                            }
+                        }
+                    }
+                }
+            }
+
+            res
         } else {
             Ok(None)
         }
@@ -112,9 +138,9 @@ impl Credential {
         }
     }
 
-    pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
+    pub fn sync(&self, job_result: &Option<&mut JobResult>) -> Result<(), String> {
         let current_type = self.get_credential_type();
-        let existing_credential = Credential::get(self.id.as_str())?;
+        let existing_credential = Credential::get(self.id.as_str(), job_result)?;
         if let Some(existing_credential) = existing_credential {
             let existing_type = existing_credential.get_credential_type();
             if *existing_type != *current_type {
