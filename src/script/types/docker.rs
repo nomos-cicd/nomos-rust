@@ -196,7 +196,7 @@ impl ScriptExecutor for DockerRunScript {
                                         let key = key.unwrap();
                                         let value = line[key.len() + 1..].trim();
                                         final_args.push("--env".to_string());
-                                        final_args.push(format!("\'{}={}\'", key, value));
+                                        final_args.push(format!("\"{}={}\"", key, value));
                                     }
                                 }
                                 _ => return Err("Credential is not of type Env".to_string()),

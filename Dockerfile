@@ -58,14 +58,11 @@ RUN ldd nomos-rust || true
 # Change ownership of the binary and data
 RUN chown -R appuser:appgroup /app /var/lib/nomos
 
-# Expose port 3000
-EXPOSE 3000
-
 # Switch to non-root user
 USER appuser
 
 # Make sure the binary is executable
 RUN chmod +x /app/nomos-rust
 
-# Add debug command
-CMD ["sh", "-c", "pwd && ls -la && exec /app/nomos-rust"]
+# Run the application
+ENTRYPOINT ["/app/nomos-rust"]
