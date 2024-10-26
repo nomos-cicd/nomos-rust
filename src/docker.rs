@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{job::JobResult, utils::execute_command};
+use crate::{job::JobResult, log::LogLevel, utils::execute_command};
 
 /// docker run -d {..args}
 pub fn docker_run(image: &str, args: Vec<&str>, directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
@@ -8,7 +8,11 @@ pub fn docker_run(image: &str, args: Vec<&str>, directory: PathBuf, job_result: 
     command.extend(args);
     command.push(image);
 
-    execute_command(&command.join(" "), directory, job_result)
+    job_result.add_log(LogLevel::Info, format!("command: docker run -d <args> {}", image));
+    if !job_result.dry_run {
+        execute_command(&command.join(" "), directory, job_result)?;
+    }
+    Ok(())
 }
 
 /// docker build -t {image} -f {dockerfile}
@@ -29,11 +33,21 @@ pub fn docker_build(
         image,
         dockerfile.display()
     );
-    execute_command(&command, directory, job_result)
+    job_result.add_log(LogLevel::Info, format!("command: {}", command));
+    if !job_result.dry_run {
+        execute_command(&command, directory, job_result)?;
+    }
+    Ok(())
 }
 
 /// docker stop {container} && docker rm {container}
 pub fn docker_stop_and_rm(container: &str, directory: PathBuf, job_result: &mut JobResult) {
-    let _ = execute_command(&format!("docker stop {}", container), directory.clone(), job_result);
-    let _ = execute_command(&format!("docker rm {}", container), directory, job_result);
+    job_result.add_log(LogLevel::Info, format!("command: docker stop {}", container));
+    if !job_result.dry_run {
+        let _ = execute_command(&format!("docker stop {}", container), directory.clone(), job_result);
+    }
+    job_result.add_log(LogLevel::Info, format!("command: docker rm {}", container));
+    if !job_result.dry_run {
+        let _ = execute_command(&format!("docker rm {}", container), directory, job_result);
+    }
 }

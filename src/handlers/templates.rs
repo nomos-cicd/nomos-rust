@@ -338,7 +338,6 @@ struct JobResultsTableTemplate {
 struct JobResultTemplate<'a> {
     title: &'a str,
     result: &'a JobResult,
-    now: DateTime<Utc>,
 }
 
 #[derive(Template)]
@@ -400,11 +399,9 @@ pub async fn template_job_result(Path(id): Path<String>) -> (StatusCode, Html<St
         return (StatusCode::NOT_FOUND, Html("".to_string()));
     }
     let result = result.unwrap();
-    let now = Utc::now();
     let template = JobResultTemplate {
         title: "Job Result",
         result: &result,
-        now,
     };
     (StatusCode::OK, Html(template.render().unwrap()))
 }

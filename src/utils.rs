@@ -10,7 +10,6 @@ use sha2::Sha256;
 use crate::{job::JobResult, log::LogLevel};
 
 pub fn execute_command(command: &str, directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
-    job_result.add_log(LogLevel::Info, format!("command: {}", command));
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
         cmd.args(["/C", command]);
@@ -38,7 +37,6 @@ pub fn execute_command_with_env(
     env: Vec<(String, String)>,
     job_result: &mut JobResult,
 ) -> Result<(), String> {
-    job_result.add_log(LogLevel::Info, format!("command: {}", command));
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
         cmd.args(["/C", command]).current_dir(directory);

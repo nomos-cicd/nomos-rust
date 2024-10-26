@@ -74,11 +74,8 @@ impl ScriptExecutor for DockerBuildScript {
                     dockerfile_path.display()
                 ));
             }
-
-            docker_build(&image, dockerfile_path, directory, job_result)?
         }
-
-        Ok(())
+        docker_build(&image, dockerfile_path, directory, job_result)
     }
 }
 
@@ -108,9 +105,7 @@ impl ScriptExecutor for DockerStopScript {
             }
         };
 
-        if !job_result.dry_run {
-            docker_stop_and_rm(&container, directory, job_result);
-        }
+        docker_stop_and_rm(&container, directory, job_result);
         Ok(())
     }
 }
@@ -210,10 +205,6 @@ impl ScriptExecutor for DockerRunScript {
         // Convert to &str for docker_run function
         let args_ref: Vec<&str> = final_args.iter().map(|s| s.as_str()).collect();
 
-        if !job_result.dry_run {
-            docker_run(&image, args_ref, directory, job_result)?
-        }
-
-        Ok(())
+        docker_run(&image, args_ref, directory, job_result)
     }
 }

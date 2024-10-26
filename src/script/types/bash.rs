@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     job::JobResult,
+    log::LogLevel,
     script::{
         utils::{ParameterSubstitution, SubstitutionResult},
         ScriptExecutor, ScriptParameterType,
@@ -38,14 +39,19 @@ impl ScriptExecutor for BashScript {
             }
         };
 
+        let original_lines = self.code.lines().collect::<Vec<&str>>();
         let lines = replaced_code.lines();
+        let mut i = 0;
         for line in lines {
             if line.is_empty() {
+                i += 1;
                 continue;
             }
+            job_result.add_log(LogLevel::Info, format!("command: {}", original_lines[i]));
             if !job_result.dry_run {
                 execute_command(line, directory.clone(), job_result)?;
             }
+            i += 1;
         }
 
         Ok(())
