@@ -351,6 +351,20 @@ pub struct JobResultsQuery {
     #[serde(rename = "job-id")]
     job_id: Option<String>,
 }
+
+#[derive(Template)]
+#[template(path = "job-result-header.html")]
+struct JobResultHeaderTemplate<'a> {
+    result: &'a JobResult,
+    now: DateTime<Utc>,
+}
+
+#[derive(Template)]
+#[template(path = "job-result-steps.html")]
+struct JobResultStepsTemplate<'a> {
+    result: &'a JobResult,
+}
+
 pub async fn template_job_results(query: Query<JobResultsQuery>) -> Html<String> {
     let results = JobResult::get_all(query.job_id.clone()).unwrap();
     let template = JobResultsTemplate {
@@ -409,4 +423,33 @@ pub async fn template_job_result_logs(Path(result_id): Path<String>) -> (StatusC
         StatusCode::INTERNAL_SERVER_ERROR,
         Html("Failed to get logs".to_string()),
     )
+}
+
+pub async fn template_job_result_header(Path(id): Path<String>) -> (StatusCode, Html<String>) {
+    let result = JobResult::get(&id);
+    if let Err(e) = result {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    }
+    let result = result.unwrap();
+    if result.is_none() {
+        return (StatusCode::NOT_FOUND, Html("".to_string()));
+    }
+    let result = result.unwrap();
+    let now = Utc::now();
+    let template = JobResultHeaderTemplate { result: &result, now };
+    (StatusCode::OK, Html(template.render().unwrap()))
+}
+
+pub async fn template_job_result_steps(Path(id): Path<String>) -> (StatusCode, Html<String>) {
+    let result = JobResult::get(&id);
+    if let Err(e) = result {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    }
+    let result = result.unwrap();
+    if result.is_none() {
+        return (StatusCode::NOT_FOUND, Html("".to_string()));
+    }
+    let result = result.unwrap();
+    let template = JobResultStepsTemplate { result: &result };
+    (StatusCode::OK, Html(template.render().unwrap()))
 }

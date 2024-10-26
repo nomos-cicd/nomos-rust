@@ -1,0 +1,22 @@
+<div class="uk-card uk-card-default uk-card-body uk-margin">
+    <h3 class="uk-card-title">
+        Job: {{ result.job_id }}
+        {% if result.finished_at.is_some() %}
+        {% if result.is_success %}
+        <span class="uk-label uk-label-success">Success</span>
+        {% else %}
+        <span class="uk-label uk-label-danger">Failed</span>
+        {% endif %}
+        {% else %}
+        <span class="uk-label">In Progress</span>
+        {% endif %}
+    </h3>
+    <p class="uk-text-meta">
+        Started: {{ result.started_at }} |
+        {% if result.finished_at.is_some() %}
+        Finished: {{ result.finished_at.unwrap() }}
+        {% else %}
+        Running for: {{ (now - result.started_at).to_string() }}
+        {% endif %}
+    </p>
+</div>

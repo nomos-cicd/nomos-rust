@@ -80,6 +80,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/job-results", routing::get(template_job_results))
         .route("/job-results/:id", routing::get(template_job_result))
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
+        .route("/job-results/:id/header", routing::get(template_job_result_header))
+        .route("/job-results/:id/steps", routing::get(template_job_result_steps))
         .route_layer(login_required!(Backend, login_url = "/login"))
         .route("/login", routing::get(template_get_login))
         .route("/login", routing::post(template_post_login))
