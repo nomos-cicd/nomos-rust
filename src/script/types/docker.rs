@@ -67,13 +67,11 @@ impl ScriptExecutor for DockerBuildScript {
             directory.join(dockerfile)
         };
 
-        if !job_result.dry_run {
-            if !dockerfile_path.exists() {
-                return Err(format!(
-                    "Dockerfile does not exist at path: {}",
-                    dockerfile_path.display()
-                ));
-            }
+        if !job_result.dry_run && !dockerfile_path.exists() {
+            return Err(format!(
+                "Dockerfile does not exist at path: {}",
+                dockerfile_path.display()
+            ));
         }
         docker_build(&image, dockerfile_path, directory, job_result)
     }

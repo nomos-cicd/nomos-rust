@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::job::JobResult;
+use crate::{job::JobResult, log::LogLevel};
 
 use super::{models::ScriptStep, types::ScriptType, ScriptParameterType};
 
@@ -22,6 +22,7 @@ impl ScriptExecutor for ScriptStep {
         step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
+        job_result.add_log(LogLevel::Info, format!("Executing step: {}", step_name));
         for value in self.values.iter() {
             value.execute(parameters, directory.clone(), step_name, job_result)?;
         }

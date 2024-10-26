@@ -34,7 +34,7 @@ pub fn git_clone(
         }
         let credential = credential.unwrap();
         if let CredentialType::Ssh(ssh_credential) = credential.value {
-            job_result.add_log(LogLevel::Info, format!("command: chmod 400 <private_key_temp_file>"));
+            job_result.add_log(LogLevel::Info, "command: chmod 400 <private_key_temp_file>".to_string());
             job_result.add_log(LogLevel::Info, format!("command: git clone -b {} {}", branch, url));
             if !job_result.dry_run {
                 let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;

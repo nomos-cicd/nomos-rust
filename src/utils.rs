@@ -80,11 +80,9 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
     // Spawn a thread to handle stdout
     let job_result_clone = job_result.clone();
     let stdout_handle = std::thread::spawn(move || {
-        for line in stdout_reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    job_result_clone.add_log(LogLevel::Info, line);
-                }
+        for line in stdout_reader.lines().map_while(Result::ok) {
+            if !line.is_empty() {
+                job_result_clone.add_log(LogLevel::Info, line);
             }
         }
     });
@@ -92,11 +90,9 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
     // Spawn a thread to handle stderr
     let job_result_clone = job_result.clone();
     let stderr_handle = std::thread::spawn(move || {
-        for line in stderr_reader.lines() {
-            if let Ok(line) = line {
-                if !line.is_empty() {
-                    job_result_clone.add_log(LogLevel::Error, line);
-                }
+        for line in stderr_reader.lines().map_while(Result::ok) {
+            if !line.is_empty() {
+                job_result_clone.add_log(LogLevel::Error, line);
             }
         }
     });
