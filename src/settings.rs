@@ -70,72 +70,85 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         job_result.add_log(LogLevel::Info, "Dry run enabled, skipping sync".to_string());
         return Ok(());
     }
+
     let settings_path = directory.join("settings.yml");
-    let settings = Settings::try_from(settings_path)?;
-    settings.sync(job_result)?;
+    if settings_path.exists() {
+        let settings = Settings::try_from(settings_path)?;
+        settings.sync(job_result)?;
+    } else {
+        job_result.add_log(LogLevel::Info, "No settings file found".to_string());
+    }
 
-    let mut script_ids: Vec<String> = Vec::new();
     let scripts_path = directory.join("scripts");
-    for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        let script = Script::try_from(path);
-        if let Err(e) = script {
-            job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
-            continue;
-        }
-        let script = script.unwrap();
-        let res = script.sync(job_result.into());
-        if let Err(e) = res {
-            job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
-            continue;
-        }
-        script_ids.push(script.id.clone());
-    }
-    let scripts = Script::get_all()?;
-    for script in scripts {
-        if !script_ids.contains(&script.id) {
-            let res = script.delete();
-            if let Err(e) = res {
-                job_result.add_log(LogLevel::Error, format!("Error deleting script: {:?}", e));
+    if scripts_path.exists() {
+        let mut script_ids: Vec<String> = Vec::new();
+        for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let script = Script::try_from(path);
+            if let Err(e) = script {
+                job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
                 continue;
             }
-            job_result.add_log(LogLevel::Info, format!("Deleted script {:?}", script.id));
+            let script = script.unwrap();
+            let res = script.sync(job_result.into());
+            if let Err(e) = res {
+                job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
+                continue;
+            }
+            script_ids.push(script.id.clone());
         }
+        let scripts = Script::get_all()?;
+        for script in scripts {
+            if !script_ids.contains(&script.id) {
+                let res = script.delete();
+                if let Err(e) = res {
+                    job_result.add_log(LogLevel::Error, format!("Error deleting script: {:?}", e));
+                    continue;
+                }
+                job_result.add_log(LogLevel::Info, format!("Deleted script {:?}", script.id));
+            }
+        }
+    } else {
+        job_result.add_log(LogLevel::Info, "No scripts directory found".to_string());
     }
 
-    let mut job_ids: Vec<String> = Vec::new();
     let jobs_path = directory.join("jobs");
-    for entry in std::fs::read_dir(jobs_path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        let job = Job::try_from(path);
-        if let Err(e) = job {
-            job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
-            continue;
-        }
-        let job = job.unwrap();
-        if job.read_only {
-            job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
-            continue;
-        }
-        let res = job.sync(job_result.into());
-        if let Err(e) = res {
-            job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
-            continue;
-        }
-        job_ids.push(job.id.clone());
-    }
-    let jobs = Job::get_all()?;
-    for job in jobs {
-        if !job_ids.contains(&job.id) && !job.read_only {
-            let res = job.delete();
-            if let Err(e) = res {
-                job_result.add_log(LogLevel::Error, format!("Error deleting job: {:?}", e));
+    if jobs_path.exists() {
+        let mut job_ids: Vec<String> = Vec::new();
+        for entry in std::fs::read_dir(jobs_path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let job = Job::try_from(path);
+            if let Err(e) = job {
+                job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
                 continue;
             }
-            job_result.add_log(LogLevel::Info, format!("Deleted job {:?}", job.id));
+            let job = job.unwrap();
+            if job.read_only {
+                job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
+                continue;
+            }
+            let res = job.sync(job_result.into());
+            if let Err(e) = res {
+                job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
+                continue;
+            }
+            job_ids.push(job.id.clone());
         }
+        let jobs = Job::get_all()?;
+        for job in jobs {
+            if !job_ids.contains(&job.id) && !job.read_only {
+                let res = job.delete();
+                if let Err(e) = res {
+                    job_result.add_log(LogLevel::Error, format!("Error deleting job: {:?}", e));
+                    continue;
+                }
+                job_result.add_log(LogLevel::Info, format!("Deleted job {:?}", job.id));
+            }
+        }
+    } else {
+        job_result.add_log(LogLevel::Info, "No jobs directory found".to_string());
     }
 
     Ok(())

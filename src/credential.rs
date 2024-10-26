@@ -86,9 +86,7 @@ impl Credential {
         let path = default_credentials_location()?.join(format!("{}.yml", credential_id));
         if path.exists() {
             let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            serde_yaml::from_str(&content)
-                .map_err(|e| e.to_string())
-                .map(Some)
+            serde_yaml::from_str(&content).map_err(|e| e.to_string()).map(Some)
         } else {
             Ok(None)
         }

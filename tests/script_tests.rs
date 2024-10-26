@@ -11,13 +11,7 @@ fn read_yml() {
     assert_eq!(script.id, "test-script");
     assert_eq!(script.parameters.len(), 2);
     assert_eq!(script.parameters[0].name, "test_param1");
-    assert_eq!(
-        script.parameters[0].default,
-        Some(ScriptParameterType::Number(5))
-    );
+    assert_eq!(script.parameters[0].default, Some(ScriptParameterType::Number(5)));
     assert_eq!(script.parameters[1].name, "test_param2");
-    assert_eq!(
-        script.parameters[1].default,
-        Some(ScriptParameterType::Boolean(true))
-    );
+    assert_eq!(script.parameters[1].default, Some(ScriptParameterType::Boolean(true)));
 }
