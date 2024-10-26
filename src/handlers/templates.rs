@@ -389,17 +389,24 @@ pub async fn template_job_result_logs(Path(result_id): Path<String>) -> (StatusC
         return (StatusCode::NOT_FOUND, Html("".to_string()));
     }
     let result = result.unwrap();
-    let logs = result.logger.get_logs().unwrap();
+    if let Ok(logger) = result.logger.lock() {
+        let logs = logger.get_logs().unwrap();
 
-    let formatted_logs: Vec<FormattedLog> = logs
-        .iter()
-        .map(|log| FormattedLog {
-            timestamp: &log.timestamp,
-            level: &log.level,
-            message: &log.message,
-        })
-        .collect();
+        let formatted_logs: Vec<FormattedLog> = logs
+            .iter()
+            .map(|log| FormattedLog {
+                timestamp: &log.timestamp,
+                level: &log.level,
+                message: &log.message,
+            })
+            .collect();
 
-    let template = JobResultLogsTemplate { logs: formatted_logs };
-    (StatusCode::OK, Html(template.render().unwrap()))
+        let template = JobResultLogsTemplate { logs: formatted_logs };
+        return (StatusCode::OK, Html(template.render().unwrap()));
+    }
+
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html("Failed to get logs".to_string()),
+    )
 }

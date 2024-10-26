@@ -1,6 +1,11 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{
+    fs::File,
+    io::BufReader,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     job::next_job_result_id,
@@ -20,7 +25,7 @@ pub struct JobResult {
     pub started_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
-    pub logger: JobLogger,
+    pub logger: Arc<Mutex<JobLogger>>,
     #[serde(skip)]
     pub dry_run: bool,
 }
@@ -85,13 +90,15 @@ impl JobResult {
         Ok(())
     }
 
-    pub fn add_log(&mut self, level: LogLevel, message: String) {
+    pub fn add_log(&self, level: LogLevel, message: String) {
         eprintln!("{:?}: {}", level, message);
         if self.dry_run {
             return;
         }
-        if let Some(current_step_name) = &self.current_step_name {
-            let _ = self.logger.log(level, current_step_name, &message);
+        if let Ok(mut logger) = self.logger.lock() {
+            if let Err(e) = logger.log(level, self.current_step_name.as_deref().unwrap_or(""), &message) {
+                eprintln!("Failed to log message: {}", e);
+            }
         }
     }
 
@@ -164,7 +171,9 @@ impl JobResult {
             started_at: Utc::now(),
             updated_at: Utc::now(),
             finished_at: None,
-            logger: JobLogger::new("dummy".to_string(), "dummy".to_string()).unwrap(),
+            logger: Arc::new(Mutex::new(
+                JobLogger::new("dummy".to_string(), "dummy".to_string(), true).unwrap(),
+            )),
             dry_run: false,
         }
     }
@@ -190,7 +199,7 @@ impl TryFrom<&Job> for JobResult {
         }
         let script = script.unwrap();
         let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
-        let logger = JobLogger::new(job.id.clone(), id.clone())?;
+        let logger = Arc::new(Mutex::new(JobLogger::new(job.id.clone(), id.clone(), false)?));
         Ok(JobResult {
             id,
             job_id: job.id.clone(),
@@ -215,7 +224,7 @@ impl TryFrom<(&Job, &Script, bool)> for JobResult {
             "dry_run".to_string()
         };
         let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
-        let logger = JobLogger::new(job.id.clone(), id.clone())?;
+        let logger = Arc::new(Mutex::new(JobLogger::new(job.id.clone(), id.clone(), dry_mode)?));
         Ok(JobResult {
             id,
             job_id: job.id.clone(),
@@ -228,5 +237,22 @@ impl TryFrom<(&Job, &Script, bool)> for JobResult {
             finished_at: None,
             logger,
         })
+    }
+}
+
+impl Clone for JobResult {
+    fn clone(&self) -> Self {
+        JobResult {
+            id: self.id.clone(),
+            job_id: self.job_id.clone(),
+            is_success: self.is_success,
+            steps: self.steps.clone(),
+            current_step_name: self.current_step_name.clone(),
+            started_at: self.started_at,
+            updated_at: self.updated_at,
+            finished_at: self.finished_at,
+            logger: Arc::clone(&self.logger),
+            dry_run: self.dry_run,
+        }
     }
 }

@@ -1,5 +1,5 @@
 use std::{
-    io::{BufReader, Read},
+    io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, Command, Stdio},
 };
@@ -76,21 +76,42 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
     }
     let stderr = stderr.unwrap();
 
-    let mut stdout_reader = BufReader::new(stdout);
-    let mut stderr_reader = BufReader::new(stderr);
+    let stdout_reader = BufReader::new(stdout);
+    let stderr_reader = BufReader::new(stderr);
 
-    // Read entire stdout
-    let mut stdout_content = String::new();
-    if stdout_reader.read_to_string(&mut stdout_content).is_ok() && !stdout_content.is_empty() {
-        job_result.add_log(LogLevel::Info, stdout_content);
-    }
+    // Spawn a thread to handle stdout
+    let job_result_clone = job_result.clone();
+    let stdout_handle = std::thread::spawn(move || {
+        for line in stdout_reader.lines() {
+            if let Ok(line) = line {
+                if !line.is_empty() {
+                    job_result_clone.add_log(LogLevel::Info, line);
+                }
+            }
+        }
+    });
 
-    // Read entire stderr
-    let mut stderr_content = String::new();
-    if stderr_reader.read_to_string(&mut stderr_content).is_ok() && !stderr_content.is_empty() {
-        job_result.add_log(LogLevel::Error, stderr_content);
-    }
+    // Spawn a thread to handle stderr
+    let job_result_clone = job_result.clone();
+    let stderr_handle = std::thread::spawn(move || {
+        for line in stderr_reader.lines() {
+            if let Ok(line) = line {
+                if !line.is_empty() {
+                    job_result_clone.add_log(LogLevel::Error, line);
+                }
+            }
+        }
+    });
 
+    // Wait for both streams to complete
+    stdout_handle
+        .join()
+        .map_err(|e| format!("stdout thread panic: {:?}", e))?;
+    stderr_handle
+        .join()
+        .map_err(|e| format!("stderr thread panic: {:?}", e))?;
+
+    // Wait for the child process to complete
     let status = child.wait().map_err(|e| e.to_string())?;
 
     if status.success() {

@@ -38,8 +38,15 @@ pub struct JobLogger {
 }
 
 impl JobLogger {
-    pub fn new(job_id: String, result_id: String) -> Result<Self, String> {
+    pub fn new(job_id: String, result_id: String, dry_run: bool) -> Result<Self, String> {
         let log_path = get_log_file_path(&job_id, &result_id)?;
+        if dry_run {
+            return Ok(JobLogger {
+                log_filename: log_path.clone(),
+                job_id,
+                result_id,
+            });
+        }
 
         // Create directory if it doesn't exist
         if let Some(parent) = log_path.parent() {
@@ -90,17 +97,18 @@ impl JobLogger {
     }
 }
 
-fn get_log_file_path(job_id: &str, result_id: &str) -> Result<PathBuf, String> {
+fn get_log_file_path(_job_id: &str, result_id: &str) -> Result<PathBuf, String> {
     if cfg!(target_os = "windows") {
         let appdata = std::env::var("APPDATA").map_err(|e| e.to_string())?;
         Ok(PathBuf::from(appdata)
             .join("nomos")
-            .join("logs")
-            .join(job_id)
-            .join(format!("{}.log", result_id)))
+            .join("job_results")
+            .join(result_id)
+            .join("log"))
     } else {
-        Ok(PathBuf::from("/var/lib/nomos/logs")
-            .join(job_id)
-            .join(format!("{}.log", result_id)))
+        Ok(PathBuf::from("/var/log/nomos")
+            .join("job_results")
+            .join(result_id)
+            .join("log"))
     }
 }
