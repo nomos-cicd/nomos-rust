@@ -10,6 +10,9 @@ parameters:
     default:
       type: string
       value: main
+  - name: git_credential_id
+    description: Git credential ID
+    required: true
   - name: docker_image
     description: Image
     required: true
@@ -35,6 +38,7 @@ steps:
       - type: git-clone
         url: $(parameters.git_url)
         branch: $(parameters.git_branch)
+        credential_id: $(parameters.git_credential_id)
   - name: Build
     values:
       - type: docker-build
