@@ -88,7 +88,7 @@ impl Credential {
             let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
             serde_yaml::from_str(&content)
                 .map_err(|e| e.to_string())
-                .map(|c| Some(c))
+                .map(Some)
         } else {
             Ok(None)
         }

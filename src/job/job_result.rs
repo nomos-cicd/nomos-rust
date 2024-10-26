@@ -189,7 +189,7 @@ impl TryFrom<&Job> for JobResult {
             return Err(format!("Script with id '{}' not found", job.script_id));
         }
         let script = script.unwrap();
-        let steps: Vec<ScriptStep> = script.steps.iter().map(|step| ScriptStep::from(step)).collect();
+        let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
         let logger = JobLogger::new(job.id.clone(), id.clone())?;
         Ok(JobResult {
             id,
