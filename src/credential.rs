@@ -82,7 +82,7 @@ impl Default for Credential {
 }
 
 impl Credential {
-    pub fn get(credential_id: &str, job_result: &Option<&mut JobResult>) -> Result<Option<Self>, String> {
+    pub fn get(credential_id: &str, job_result: Option<&mut JobResult>) -> Result<Option<Self>, String> {
         let path = default_credentials_location()?.join(format!("{}.yml", credential_id));
         if path.exists() {
             let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -138,24 +138,30 @@ impl Credential {
         }
     }
 
-    pub fn sync(&self, job_result: &Option<&mut JobResult>) -> Result<(), String> {
+    // If job_result is null, it means we are doing from the API. Allow it.
+    // If job_result is not null, it means we are doing from the job. Check if the credential is changed.
+    pub fn sync(&self, job_result: &mut Option<&mut JobResult>) -> Result<(), String> {
+        if job_result.is_none() {
+            eprintln!("Syncing credential {:?}", self.id);
+            self.save()?;
+            return Ok(());
+        }
+        let job_result = job_result.as_deref_mut();
+        let job_result = job_result.unwrap();
+
         let current_type = self.get_credential_type();
-        let existing_credential = Credential::get(self.id.as_str(), job_result)?;
+        let existing_credential = Credential::get(self.id.as_str(), Some(job_result))?;
         if let Some(existing_credential) = existing_credential {
             let existing_type = existing_credential.get_credential_type();
             if *existing_type != *current_type {
                 self.save()?;
-                if let Some(job_result) = job_result {
-                    job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
-                }
-            } else if let Some(job_result) = job_result {
+                job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
+            } else {
                 job_result.add_log(LogLevel::Info, format!("No changes in credential {:?}", self.id))
             }
         } else {
             self.save()?;
-            if let Some(job_result) = job_result {
-                job_result.add_log(LogLevel::Info, format!("Created credential {:?}", self.id))
-            }
+            job_result.add_log(LogLevel::Info, format!("Created credential {:?}", self.id))
         }
 
         Ok(())

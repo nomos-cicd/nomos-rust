@@ -185,7 +185,7 @@ impl ScriptExecutor for DockerRunScript {
                 DockerRunArg::EnvFromCredential { credential_id } => {
                     let credential_id_resolved = credential_id.substitute_parameters(parameters, true)?;
                     if let Some(SubstitutionResult::Single(id)) = credential_id_resolved {
-                        if let Some(credential) = Credential::get(&id, &Some(job_result))? {
+                        if let Some(credential) = Credential::get(&id, Some(job_result))? {
                             match credential.value {
                                 CredentialType::Env(env) => {
                                     for line in env.value.lines() {
