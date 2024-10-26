@@ -189,7 +189,14 @@ impl ScriptExecutor for DockerRunScript {
                             match credential.value {
                                 CredentialType::Env(env) => {
                                     for line in env.value.lines() {
-                                        final_args.push(format!("--env {}", line));
+                                        let key = line.split('=').next();
+                                        if key.is_none() {
+                                            return Err("Invalid env credential".to_string());
+                                        }
+                                        let key = key.unwrap();
+                                        let value = line[key.len() + 1..].trim();
+                                        final_args.push("--env".to_string());
+                                        final_args.push(format!("\'{}={}\'", key, value));
                                     }
                                 }
                                 _ => return Err("Credential is not of type Env".to_string()),
