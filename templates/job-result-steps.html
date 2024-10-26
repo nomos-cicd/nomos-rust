@@ -1,35 +1,35 @@
-<div class="uk-card uk-card-default uk-card-body uk-margin">
-    <h4 class="uk-card-title">Steps</h4>
-    <ul class="uk-timeline">
-        {% for step in result.steps %}
-        <li class="uk-timeline-item">
-            <div class="uk-timeline-icon">
+<h3 class="uk-card-title">Steps</h3>
+<ul class="uk-list uk-list-divider uk-margin-remove uk-padding-remove">
+    {% for step in result.steps %}
+    <li>
+        <div class="uk-grid-small uk-flex-middle" uk-grid>
+            <div class="uk-width-auto">
                 {% if step.is_finished %}
                 {% if step.is_success %}
-                <span class="uk-icon" uk-icon="icon: check; ratio: 1.2" style="color: green;"></span>
+                <span style="color: green;">✓</span>
                 {% else %}
-                <span class="uk-icon" uk-icon="icon: close; ratio: 1.2" style="color: red;"></span>
+                <span style="color: red;">✗</span>
                 {% endif %}
                 {% else %}
                 {% if step.is_started %}
                 <div uk-spinner></div>
                 {% else %}
-                <span class="uk-icon" uk-icon="icon: clock; ratio: 1.2"></span>
+                <span>⏱</span>
                 {% endif %}
                 {% endif %}
             </div>
-            <div class="uk-timeline-content">
+            <div class="uk-width-expand">
                 <h4 class="uk-margin-remove">{{ step.name }}</h4>
-                <p class="uk-text-meta uk-margin-remove">
-                    {% if step.is_started %}
+                {% if step.is_started %}
+                <p class="uk-text-small uk-text-muted uk-margin-remove">
                     Started: {{ step.started_at }}
                     {% if step.is_finished %}
                     | Finished: {{ step.finished_at }}
                     {% endif %}
-                    {% endif %}
                 </p>
+                {% endif %}
             </div>
-        </li>
-        {% endfor %}
-    </ul>
-</div>
+        </div>
+    </li>
+    {% endfor %}
+</ul>
