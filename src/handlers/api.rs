@@ -279,6 +279,11 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode
 
                     let is_valid =
                         is_signature_valid(&body, signature.unwrap().to_str().unwrap(), &text_credential.value);
+                    if let Err(err) = is_valid {
+                        eprintln!("Failed to validate signature: {}", err);
+                        continue;
+                    }
+                    let is_valid = is_valid.unwrap();
                     if !is_valid {
                         eprintln!("Invalid signature");
                         continue;

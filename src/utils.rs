@@ -122,10 +122,10 @@ pub fn execute_script(mut child: Child, job_result: &mut JobResult) -> Result<()
 }
 
 type HmacSha256 = Hmac<Sha256>;
-pub fn is_signature_valid(payload: &str, signature: &str, secret: &str) -> bool {
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("Invalid key length");
+pub fn is_signature_valid(payload: &str, signature: &str, secret: &str) -> Result<bool, String> {
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(|e| e.to_string())?;
     mac.update(payload.as_bytes());
     let result = mac.finalize();
-    let result = hex::encode(result.into_bytes());
-    result == signature
+    let result = format!("sha256={}", hex::encode(result.into_bytes()));
+    Ok(result == signature)
 }
