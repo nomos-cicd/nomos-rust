@@ -22,7 +22,7 @@ impl ScriptExecutor for SyncScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: PathBuf,
+        directory: &PathBuf,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {

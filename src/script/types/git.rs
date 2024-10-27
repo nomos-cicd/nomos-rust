@@ -23,7 +23,7 @@ impl ScriptExecutor for GitCloneScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: PathBuf,
+        directory: &PathBuf,
         step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -72,19 +72,19 @@ impl ScriptExecutor for GitCloneScript {
         git_clone(
             &url,
             branch.as_str(),
-            directory.clone(),
+            directory,
             credential_id.as_deref(),
             job_result,
         )?;
 
-        let mut cloned_dir = directory.clone().join(url.split('/').last().unwrap());
-        if cloned_dir.to_str().unwrap().ends_with(".git") {
-            cloned_dir = PathBuf::from(cloned_dir.to_str().unwrap().strip_suffix(".git").unwrap());
+        let mut new_dir = directory.join(url.split('/').last().unwrap());
+        if new_dir.to_str().unwrap().ends_with(".git") {
+            new_dir = PathBuf::from(new_dir.to_str().unwrap().strip_suffix(".git").unwrap());
         }
 
         parameters.insert(
             format!("steps.{}.git-clone.directory", step_name),
-            ScriptParameterType::String(cloned_dir.to_str().unwrap().to_string()),
+            ScriptParameterType::String(new_dir.to_str().unwrap().to_string()),
         );
 
         Ok(())

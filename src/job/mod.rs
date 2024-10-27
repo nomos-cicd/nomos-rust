@@ -118,7 +118,7 @@ impl Job {
         job_result.save()?;
 
         tokio::spawn(async move {
-            let _ = Job::execute_job_result(&mut job_result, directory, &mut merged_parameters);
+            let _ = Job::execute_job_result(&mut job_result, &directory, &mut merged_parameters);
         });
 
         Ok(id)
@@ -127,7 +127,7 @@ impl Job {
     /// parameters should be prepared by the caller
     pub fn execute_job_result(
         job_result: &mut JobResult,
-        directory: PathBuf,
+        directory: &PathBuf,
         parameters: &mut HashMap<String, ScriptParameterType>,
     ) -> Result<(), String> {
         let mut is_success = true;
@@ -139,7 +139,7 @@ impl Job {
             let step_name = current_step.name.clone();
 
             // Mutable borrow of `job_result` is now safe
-            let result = current_step.execute(parameters, directory.clone(), step_name.as_str(), job_result);
+            let result = current_step.execute(parameters, directory, step_name.as_str(), job_result);
 
             if result.is_err() {
                 let message = format!("Error in step {}: {:?}", step_name, result.err().unwrap());
@@ -263,7 +263,7 @@ impl Job {
         let directory = PathBuf::from("tmp");
         Job::execute_job_result(
             &mut JobResult::try_from((self, &script, true))?,
-            directory,
+            &directory,
             &mut merged_parameters,
         )
     }

@@ -23,7 +23,7 @@ impl ScriptExecutor for DockerBuildScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: PathBuf,
+        directory: &PathBuf,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -73,7 +73,7 @@ impl ScriptExecutor for DockerBuildScript {
                 dockerfile_path.display()
             ));
         }
-        docker_build(&image, dockerfile_path, directory, job_result)
+        docker_build(&image, &dockerfile_path, directory, job_result)
     }
 }
 
@@ -87,7 +87,7 @@ impl ScriptExecutor for DockerStopScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: PathBuf,
+        directory: &PathBuf,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -126,7 +126,7 @@ impl ScriptExecutor for DockerRunScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: PathBuf,
+        directory: &PathBuf,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {

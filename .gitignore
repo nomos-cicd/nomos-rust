@@ -1,2 +1,4 @@
 /target
 repopack-output.txt
+.VSCodeCounter
+tarpaulin-report.html

@@ -22,7 +22,7 @@ impl ScriptExecutor for BashScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: PathBuf,
+        directory: &PathBuf,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -49,7 +49,7 @@ impl ScriptExecutor for BashScript {
             }
             job_result.add_log(LogLevel::Info, format!("command: {}", original_lines[i]));
             if !job_result.dry_run {
-                execute_command(line, directory.clone(), job_result)?;
+                execute_command(line, directory, job_result)?;
             }
             i += 1;
         }

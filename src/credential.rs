@@ -69,7 +69,7 @@ impl PartialEq for Credential {
 impl Credential {
     pub fn get(credential_id: &str, job_result: Option<&mut JobResult>) -> Result<Option<Self>, String> {
         let path = default_credentials_location()?.join(format!("{}.yml", credential_id));
-        let credential = Credential::try_from(path.clone());
+        let credential = Credential::try_from(path);
         if credential.is_ok() {
             let credential = credential.unwrap();
             if let Some(job_result) = job_result {

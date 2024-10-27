@@ -12,7 +12,7 @@ use crate::{
 pub fn git_clone(
     url: &str,
     branch: &str,
-    directory: PathBuf,
+    directory: &PathBuf,
     credential_id: Option<&str>,
     job_result: &mut JobResult,
 ) -> Result<(), String> {
@@ -21,7 +21,7 @@ pub fn git_clone(
             // Workaround for local
             execute_command(
                 &format!("git clone -b {} {}", branch, url),
-                directory.clone(),
+                directory,
                 job_result,
             )?;
         }
@@ -43,7 +43,7 @@ pub fn git_clone(
 
                 execute_command(
                     &format!("chmod 400 {}", tmp_path.display()),
-                    directory.clone(),
+                    directory,
                     job_result,
                 )?;
 
@@ -53,7 +53,7 @@ pub fn git_clone(
                 )];
                 execute_command_with_env(
                     &format!("git clone -b {} {}", branch, url),
-                    directory.clone(),
+                    directory,
                     env,
                     job_result,
                 )?;
