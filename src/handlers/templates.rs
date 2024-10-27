@@ -4,7 +4,7 @@ use askama::Template;
 use axum::{
     extract::{Path, Query},
     http::StatusCode,
-    response::{Html, IntoResponse, Redirect},
+    response::{Html, IntoResponse, Redirect, Response},
     Form,
 };
 use chrono::{DateTime, Utc};
@@ -77,17 +77,17 @@ struct CredentialsTemplate<'a> {
     credentials: Vec<Credential>,
 }
 
-pub async fn template_credentials() -> Html<String> {
+pub async fn template_credentials() -> Response {
     let credentials = Credential::get_all();
-    if let Err(e) = credentials {
-        return Html(e.to_string());
+    if let Err(_) = credentials {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let credentials = credentials.unwrap();
     let template = CredentialsTemplate {
         title: "Credentials",
         credentials,
     };
-    Html(template.render().unwrap())
+    Html(template.render().unwrap()).into_response()
 }
 
 #[derive(Template)]
@@ -98,22 +98,22 @@ struct CredentialTemplate<'a> {
     credential_value: &'a CredentialType,
 }
 
-pub async fn template_update_credential(Path(id): Path<String>) -> Html<String> {
+pub async fn template_update_credential(Path(id): Path<String>) -> Response {
     template_credential(Some(axum::extract::Path(id)), "Credentials").await
 }
 
-pub async fn template_create_credential() -> Html<String> {
+pub async fn template_create_credential() -> Response {
     template_credential(None, "Create Credentials").await
 }
 
-pub async fn template_credential(id: Option<Path<String>>, title: &str) -> Html<String> {
+pub async fn template_credential(id: Option<Path<String>>, title: &str) -> Response {
     let credential = if let Some(id) = id {
         Credential::get(id.as_str(), None)
     } else {
         Ok(None)
     };
-    if let Err(e) = credential {
-        return Html(e.to_string());
+    if let Err(_) = credential {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let credential = credential.unwrap();
     let default_value = CredentialType::from_str("ssh").unwrap();
@@ -129,7 +129,7 @@ pub async fn template_credential(id: Option<Path<String>>, title: &str) -> Html<
         credential: credential.as_ref(),
         credential_value,
     };
-    Html(template.render().unwrap())
+    Html(template.render().unwrap()).into_response()
 }
 
 #[derive(Template)]
@@ -145,11 +145,11 @@ pub struct CredentialValueQuery {
     credential_type: String,
 }
 
-pub async fn template_credential_value(params: Query<CredentialValueQuery>) -> (StatusCode, Html<String>) {
+pub async fn template_credential_value(params: Query<CredentialValueQuery>) -> Response {
     if let Some(id) = &params.id {
         let credential = Credential::get(id.as_str(), None);
-        if let Err(e) = credential {
-            return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+        if let Err(_) = credential {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
         let credential = credential.unwrap();
         if let Some(credential) = credential {
@@ -157,7 +157,7 @@ pub async fn template_credential_value(params: Query<CredentialValueQuery>) -> (
                 let template = CredentialValueTemplate {
                     credential_value: &credential.value,
                 };
-                return (StatusCode::OK, Html(template.render().unwrap()));
+                return (StatusCode::OK, Html(template.render().unwrap())).into_response();
             }
         }
     }
@@ -168,10 +168,10 @@ pub async fn template_credential_value(params: Query<CredentialValueQuery>) -> (
         let template = CredentialValueTemplate {
             credential_value: &credential_type,
         };
-        return (StatusCode::OK, Html(template.render().unwrap()));
+        return Html(template.render().unwrap()).into_response();
     }
 
-    (StatusCode::BAD_REQUEST, Html("Invalid credential type".to_string()))
+    StatusCode::BAD_REQUEST.into_response()
 }
 
 #[derive(Template)]
@@ -189,35 +189,35 @@ struct ScriptTemplate<'a> {
     // json_schema: &'a str,
 }
 
-pub async fn template_scripts() -> (StatusCode, Html<String>) {
+pub async fn template_scripts() -> Response {
     let scripts = Script::get_all();
-    if let Err(e) = scripts {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    if let Err(_) = scripts {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let scripts = scripts.unwrap();
     let template = ScriptsTemplate {
         title: "Scripts",
         scripts,
     };
-    (StatusCode::OK, Html(template.render().unwrap()))
+    Html(template.render().unwrap()).into_response()
 }
 
-pub async fn template_update_script(Path(id): Path<String>) -> (StatusCode, Html<String>) {
+pub async fn template_update_script(Path(id): Path<String>) -> Response {
     template_script(Some(axum::extract::Path(id)), "Scripts").await
 }
 
-pub async fn template_create_script() -> (StatusCode, Html<String>) {
+pub async fn template_create_script() -> Response {
     template_script(None, "Create Script").await
 }
 
-pub async fn template_script(id: Option<Path<String>>, title: &str) -> (StatusCode, Html<String>) {
+pub async fn template_script(id: Option<Path<String>>, title: &str) -> Response {
     let script = if let Some(id) = id {
         Script::get(id.as_str())
     } else {
         Ok(None)
     };
-    if let Err(e) = script {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    if let Err(_) = script {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let script = script.unwrap();
 
@@ -234,7 +234,7 @@ pub async fn template_script(id: Option<Path<String>>, title: &str) -> (StatusCo
         script: script_yaml.as_deref(),
         // json_schema: &json_schema_str,
     };
-    (StatusCode::OK, Html(template.render().unwrap()))
+    Html(template.render().unwrap()).into_response()
 }
 
 #[derive(Template)]
@@ -260,32 +260,32 @@ pub struct JobFormQuery {
     from_job_id: Option<String>,
 }
 
-pub async fn template_jobs() -> Html<String> {
+pub async fn template_jobs() -> Response {
     let jobs = job::Job::get_all();
-    if let Err(e) = jobs {
-        return Html(e.to_string());
+    if let Err(_) = jobs {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let jobs = jobs.unwrap();
     let template = JobsTemplate { title: "Jobs", jobs };
-    Html(template.render().unwrap())
+    Html(template.render().unwrap()).into_response()
 }
 
-pub async fn template_update_job(Path(id): Path<String>) -> Html<String> {
+pub async fn template_update_job(Path(id): Path<String>) -> Response {
     template_job(Some(axum::extract::Path(id)), "Jobs", Default::default()).await
 }
 
-pub async fn template_create_job(params: Query<JobFormQuery>) -> Html<String> {
+pub async fn template_create_job(params: Query<JobFormQuery>) -> Response {
     template_job(None, "Create Job", params).await
 }
 
-pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<JobFormQuery>) -> Html<String> {
+pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<JobFormQuery>) -> Response {
     let job = if let Some(id) = id {
         job::Job::get(id.as_str())
     } else {
         Ok(None)
     };
-    if let Err(e) = job {
-        return Html(e.to_string());
+    if let Err(_) = job {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let job = job.unwrap();
 
@@ -296,8 +296,8 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
 
     if let Some(from_script_id) = &params.from_script_id {
         let script = Script::get(from_script_id.as_str());
-        if let Err(e) = script {
-            return Html(e.to_string());
+        if let Err(_) = script {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
         let script = script.unwrap();
         if let Some(script) = script {
@@ -307,8 +307,8 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
 
     if let Some(from_job_id) = &params.from_job_id {
         let job = job::Job::get(from_job_id.as_str());
-        if let Err(e) = job {
-            return Html(e.to_string());
+        if let Err(_) = job {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
         let job = job.unwrap();
         if let Some(job) = job {
@@ -324,7 +324,7 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
         job: job_yaml.as_deref(),
         // json_schema: &json_schema_str,
     };
-    Html(template.render().unwrap())
+    Html(template.render().unwrap()).into_response()
 }
 
 #[derive(Template)]
@@ -379,10 +379,10 @@ struct JobResultStepsTemplate<'a> {
     result: &'a JobResult,
 }
 
-pub async fn template_job_results(query: Query<JobResultsQuery>) -> Html<String> {
+pub async fn template_job_results(query: Query<JobResultsQuery>) -> Response {
     let results = JobResult::get_all(query.job_id.clone());
-    if let Err(e) = results {
-        return Html(e.to_string());
+    if let Err(_) = results {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let results = results.unwrap();
     let has_in_progress = results.iter().any(|r| r.finished_at.is_none());
@@ -392,44 +392,44 @@ pub async fn template_job_results(query: Query<JobResultsQuery>) -> Html<String>
         has_in_progress,
         job_id_filter: query.job_id.as_deref(),
     };
-    Html(template.render().unwrap())
+    Html(template.render().unwrap()).into_response()
 }
 
-pub async fn template_job_results_table(query: Query<JobResultsQuery>) -> Html<String> {
+pub async fn template_job_results_table(query: Query<JobResultsQuery>) -> Response {
     let results = JobResult::get_all(query.job_id.clone());
-    if let Err(e) = results {
-        return Html(e.to_string());
+    if let Err(_) = results {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let results = results.unwrap();
     let template = JobResultsTableTemplate { results };
-    Html(template.render().unwrap())
+    Html(template.render().unwrap()).into_response()
 }
 
-pub async fn template_job_result(Path(id): Path<String>) -> (StatusCode, Html<String>) {
+pub async fn template_job_result(Path(id): Path<String>) -> Response {
     let result = JobResult::get(&id);
-    if let Err(e) = result {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    if let Err(_) = result {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();
     if result.is_none() {
-        return (StatusCode::NOT_FOUND, Html("".to_string()));
+        return StatusCode::NOT_FOUND.into_response();
     }
     let result = result.unwrap();
     let template = JobResultTemplate {
         title: "Job Result",
         result: &result,
     };
-    (StatusCode::OK, Html(template.render().unwrap()))
+    Html(template.render().unwrap()).into_response()
 }
 
-pub async fn template_job_result_logs(Path(result_id): Path<String>) -> (StatusCode, Html<String>) {
+pub async fn template_job_result_logs(Path(result_id): Path<String>) -> Response {
     let result = JobResult::get(&result_id);
-    if let Err(e) = result {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    if let Err(_) = result {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();
     if result.is_none() {
-        return (StatusCode::NOT_FOUND, Html("".to_string()));
+        return StatusCode::NOT_FOUND.into_response();
     }
     let result = result.unwrap();
     if let Ok(logger) = result.logger.lock() {
@@ -445,40 +445,40 @@ pub async fn template_job_result_logs(Path(result_id): Path<String>) -> (StatusC
             .collect();
 
         let template = JobResultLogsTemplate { logs: formatted_logs };
-        return (StatusCode::OK, Html(template.render().unwrap()));
+        return Html(template.render().unwrap()).into_response();
     }
 
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Html("Failed to get logs".to_string()),
-    )
+    StatusCode::INTERNAL_SERVER_ERROR.into_response()
 }
 
-pub async fn template_job_result_header(Path(id): Path<String>) -> (StatusCode, Html<String>) {
+pub async fn template_job_result_header(Path(id): Path<String>) -> Response {
     let result = JobResult::get(&id);
-    if let Err(e) = result {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    if let Err(_) = result {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();
     if result.is_none() {
-        return (StatusCode::NOT_FOUND, Html("".to_string()));
+        return StatusCode::NOT_FOUND.into_response();
     }
-    let result = result.unwrap();
     let now = Utc::now();
-    let template = JobResultHeaderTemplate { result: &result, now };
-    (StatusCode::OK, Html(template.render().unwrap()))
+    let template = JobResultHeaderTemplate {
+        result: &result.unwrap(),
+        now,
+    };
+    Html(template.render().unwrap()).into_response()
 }
 
-pub async fn template_job_result_steps(Path(id): Path<String>) -> (StatusCode, Html<String>) {
+pub async fn template_job_result_steps(Path(id): Path<String>) -> Response {
     let result = JobResult::get(&id);
-    if let Err(e) = result {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(e.to_string()));
+    if let Err(_) = result {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();
     if result.is_none() {
-        return (StatusCode::NOT_FOUND, Html("".to_string()));
+        return StatusCode::NOT_FOUND.into_response();
     }
-    let result = result.unwrap();
-    let template = JobResultStepsTemplate { result: &result };
-    (StatusCode::OK, Html(template.render().unwrap()))
+    let template = JobResultStepsTemplate {
+        result: &result.unwrap(),
+    };
+    Html(template.render().unwrap()).into_response()
 }

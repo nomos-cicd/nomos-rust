@@ -73,7 +73,7 @@ impl Credential {
         if credential.is_ok() {
             let credential = credential.unwrap();
             if let Some(job_result) = job_result {
-                match credential.clone().value {
+                match &credential.value {
                     CredentialType::Text(text) => {
                         if text.value.is_empty() {
                             job_result.add_log(LogLevel::Warning, format!("Empty text credential: {}", credential_id));

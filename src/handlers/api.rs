@@ -16,319 +16,337 @@ use crate::{
 };
 
 pub async fn get_credentials() -> Response {
-    let credentials = credential::Credential::get_all();
-    if credentials.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match credential::Credential::get_all() {
+        Ok(credentials) => Json(credentials).into_response(),
+        Err(e) => {
+            eprintln!("Failed to get credentials: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    Json(credentials.unwrap()).into_response()
 }
 
 pub async fn get_credential(Path(id): Path<String>) -> Response {
-    let credential = credential::Credential::get(id.as_str(), None);
-    if credential.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match credential::Credential::get(id.as_str(), None) {
+        Ok(Some(credential)) => Json(credential).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("Failed to get credential {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let credential = credential.unwrap();
-    if credential.is_none() {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-
-    Json(credential.unwrap()).into_response()
 }
 
 pub async fn create_credential(Json(credential): Json<Credential>) -> Response {
-    let credential = credential::Credential::try_from(credential);
-    if credential.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match credential::Credential::try_from(credential) {
+        Ok(credential) => match credential.sync(&mut None) {
+            Ok(_) => Json(credential).into_response(),
+            Err(e) => {
+                eprintln!("Failed to sync credential: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to create credential: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let credential = credential.unwrap();
-    let res = credential.sync(&mut None);
-    if res.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
-    Json(credential).into_response()
 }
 
-pub async fn delete_credential(Path(id): Path<String>) -> StatusCode {
-    let credential = credential::Credential::get(id.as_str(), None);
-    if credential.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR;
+pub async fn delete_credential(Path(id): Path<String>) -> Response {
+    match credential::Credential::get(id.as_str(), None) {
+        Ok(Some(credential)) => match credential.delete() {
+            Ok(_) => StatusCode::NO_CONTENT.into_response(),
+            Err(e) => {
+                eprintln!("Failed to delete credential {}: {}", id, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        },
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("Failed to get credential for deletion {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let credential = credential.unwrap();
-    if credential.is_none() {
-        return StatusCode::NOT_FOUND;
-    }
-    let res = credential.unwrap().delete();
-    if res.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    }
-    StatusCode::NO_CONTENT
 }
 
 pub async fn get_credential_types() -> Response {
-    let credential_types = credential::CredentialType::get_json_schema();
-    Json(credential_types).into_response()
+    Json(credential::CredentialType::get_json_schema()).into_response()
 }
 
 pub async fn get_scripts() -> Response {
-    let scripts = Script::get_all();
-    if scripts.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match Script::get_all() {
+        Ok(scripts) => Json(scripts).into_response(),
+        Err(e) => {
+            eprintln!("Failed to get scripts: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    Json(scripts.unwrap()).into_response()
 }
 
 pub async fn get_script(Path(id): Path<String>) -> Response {
-    let script = Script::get(id.as_str());
-    if script.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match Script::get(id.as_str()) {
+        Ok(Some(script)) => Json(script).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("Failed to get script {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let script = script.unwrap();
-    if script.is_none() {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-
-    Json(script.unwrap()).into_response()
 }
 
 pub async fn create_script(headers: HeaderMap, body: String) -> Response {
-    let content_type = headers.get("content-type");
-    if content_type.is_none() {
-        return StatusCode::BAD_REQUEST.into_response();
-    }
+    let content_type = match headers.get("content-type") {
+        Some(ct) => ct.to_str().unwrap_or(""),
+        None => return StatusCode::BAD_REQUEST.into_response(),
+    };
 
-    let content_type = content_type.unwrap().to_str().unwrap();
     if content_type != "application/yaml" {
         return StatusCode::BAD_REQUEST.into_response();
     }
 
-    let script: Script = serde_yaml::from_str(body.as_str()).unwrap();
-    let res = script.sync(None);
-    if res.is_err() {
-        return StatusCode::BAD_REQUEST.into_response();
+    match serde_yaml::from_str::<Script>(&body) {
+        Ok(script) => match script.sync(None) {
+            Ok(_) => Json(script).into_response(),
+            Err(e) => {
+                eprintln!("Failed to sync script: {}", e);
+                StatusCode::BAD_REQUEST.into_response()
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to parse script YAML: {}", e);
+            StatusCode::BAD_REQUEST.into_response()
+        }
     }
-    Json(script).into_response()
 }
 
-pub async fn delete_script(Path(id): Path<String>) -> StatusCode {
-    let script = Script::get(id.as_str());
-    if script.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR;
+pub async fn delete_script(Path(id): Path<String>) -> Response {
+    match Script::get(id.as_str()) {
+        Ok(Some(script)) => match script.delete() {
+            Ok(_) => StatusCode::NO_CONTENT.into_response(),
+            Err(e) => {
+                eprintln!("Failed to delete script {}: {}", id, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        },
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("Failed to get script for deletion {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let script = script.unwrap();
-    if script.is_none() {
-        return StatusCode::NOT_FOUND;
-    }
-    let res = script.unwrap().delete();
-    if res.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    }
-    StatusCode::NO_CONTENT
 }
 
 pub async fn get_script_parameter_types() -> Response {
-    let script_parameter_types = script::ScriptParameterType::get_json_schema();
-    if let Err(_) = script_parameter_types {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match script::ScriptParameterType::get_json_schema() {
+        Ok(types) => Json(types).into_response(),
+        Err(e) => {
+            eprintln!("Failed to get script parameter types: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    Json(script_parameter_types.unwrap()).into_response()
 }
 
 pub async fn get_jobs() -> Response {
-    let jobs = job::Job::get_all();
-    if jobs.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match job::Job::get_all() {
+        Ok(jobs) => Json(jobs).into_response(),
+        Err(e) => {
+            eprintln!("Failed to get jobs: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    Json(jobs.unwrap()).into_response()
 }
 
 pub async fn get_job(Path(id): Path<String>) -> Response {
-    let job = job::Job::get(id.as_str());
-    if job.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match job::Job::get(id.as_str()) {
+        Ok(Some(job)) => Json(job).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("Failed to get job {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let job = job.unwrap();
-    if job.is_none() {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-
-    Json(job.unwrap()).into_response()
 }
 
-pub async fn create_job(headers: HeaderMap, body: String) -> (StatusCode, String) {
-    let content_type = headers.get("content-type");
-    if content_type.is_none() {
-        return (StatusCode::BAD_REQUEST, "Empty content-type".to_string());
-    }
+pub async fn create_job(headers: HeaderMap, body: String) -> Response {
+    let content_type = match headers.get("content-type") {
+        Some(ct) => ct.to_str().unwrap_or(""),
+        None => return (StatusCode::BAD_REQUEST, "Empty content-type").into_response(),
+    };
 
-    let content_type = content_type.unwrap().to_str().unwrap();
     if content_type != "application/yaml" {
-        return (
-            StatusCode::BAD_REQUEST,
-            "Only application/yaml is supported".to_string(),
-        );
+        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
     }
 
-    let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
-    let res = job.sync(None);
-    if let Err(err) = res {
-        return (StatusCode::BAD_REQUEST, err);
+    match serde_yaml::from_str::<job::Job>(&body) {
+        Ok(job) => match job.sync(None) {
+            Ok(_) => (StatusCode::CREATED, job.id).into_response(),
+            Err(e) => {
+                eprintln!("Failed to sync job: {}", e);
+                (StatusCode::BAD_REQUEST, e).into_response()
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to parse job YAML: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+        }
     }
-    (StatusCode::CREATED, job.id)
 }
 
-pub async fn delete_job(Path(id): Path<String>) -> StatusCode {
-    let job = job::Job::get(id.as_str());
-    if job.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR;
+pub async fn delete_job(Path(id): Path<String>) -> Response {
+    match job::Job::get(id.as_str()) {
+        Ok(Some(job)) => match job.delete() {
+            Ok(_) => StatusCode::NO_CONTENT.into_response(),
+            Err(e) => {
+                eprintln!("Failed to delete job {}: {}", id, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        },
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("Failed to get job for deletion {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let job = job.unwrap();
-    if job.is_none() {
-        return StatusCode::NOT_FOUND;
-    }
-    let res = job.unwrap().delete();
-    if res.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    }
-    StatusCode::NO_CONTENT
 }
 
-pub async fn execute_job(
-    Path(id): Path<String>,
-    /*Json(parameters): Json<HashMap<String, ScriptParameterType>>,*/
-) -> (StatusCode, String) {
-    let job = job::Job::get(id.as_str());
-    if job.is_err() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "".to_string());
+pub async fn execute_job(Path(id): Path<String>) -> Response {
+    match job::Job::get(id.as_str()) {
+        Ok(Some(job)) => match job.execute(Default::default()) {
+            Ok(result) => (StatusCode::OK, result).into_response(),
+            Err(e) => {
+                eprintln!("Failed to execute job {}: {}", id, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        },
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("Failed to get job for execution {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let job = job.unwrap();
-    if job.is_none() {
-        return (StatusCode::NOT_FOUND, "".to_string());
-    }
-    let result = job.unwrap().execute(Default::default());
-    if result.is_err() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "".to_string());
-    }
-
-    (StatusCode::OK, result.unwrap())
 }
 
 pub async fn dry_run_job(headers: HeaderMap, body: String) -> Response {
-    let content_type = headers.get("content-type");
-    if content_type.is_none() {
-        return (StatusCode::BAD_REQUEST, "Empty content-type".to_string()).into_response();
-    }
+    let content_type = match headers.get("content-type") {
+        Some(ct) => ct.to_str().unwrap_or(""),
+        None => return (StatusCode::BAD_REQUEST, "Empty content-type").into_response(),
+    };
 
-    let content_type = content_type.unwrap().to_str().unwrap();
     if content_type != "application/yaml" {
-        return (
-            StatusCode::BAD_REQUEST,
-            "Only application/yaml is supported".to_string(),
-        )
-            .into_response();
+        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
     }
 
-    let job: job::Job = serde_yaml::from_str(body.as_str()).unwrap();
-    let res = job.validate(None, Default::default());
-    if let Err(err) = res {
-        return (StatusCode::BAD_REQUEST, err).into_response();
-    }
-
-    StatusCode::OK.into_response()
-}
-
-pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> StatusCode {
-    let jobs = job::Job::get_all();
-    if jobs.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    }
-
-    let jobs = jobs.unwrap();
-    for job in jobs {
-        for trigger in job.triggers.iter() {
-            match trigger {
-                job::TriggerType::Github(val) => {
-                    let signature = headers.get("x-hub-signature-256");
-                    let github_event = headers.get("x-github-event");
-                    if signature.is_none() || github_event.is_none() {
-                        eprintln!("Signature or Event not found in headers");
-                        continue;
-                    }
-
-                    let payload: Result<job::GithubPayload, serde_json::Error> = serde_json::from_str(body.as_str());
-                    if payload.is_err() {
-                        continue;
-                    }
-                    let payload = payload.unwrap();
-
-                    let credential = credential::Credential::get(val.secret_credential_id.as_str(), None);
-                    if credential.is_err() {
-                        eprintln!("Failed to get credential: {}", val.secret_credential_id);
-                        continue;
-                    }
-                    let credential = credential.unwrap();
-                    if credential.is_none() {
-                        eprintln!("Credential not found: {}", val.secret_credential_id);
-                        continue;
-                    }
-                    let credential = credential.unwrap();
-                    let text_credential: Option<credential::TextCredentialParameter> = match credential.value {
-                        credential::CredentialType::Text(val) => Some(val),
-                        _ => None,
-                    };
-                    if text_credential.is_none() {
-                        eprintln!("Credential is not Text: {}", val.secret_credential_id);
-                        continue;
-                    }
-                    let text_credential = text_credential.unwrap();
-
-                    let is_valid =
-                        is_signature_valid(&body, signature.unwrap().to_str().unwrap(), &text_credential.value);
-                    if let Err(err) = is_valid {
-                        eprintln!("Failed to validate signature: {}", err);
-                        continue;
-                    }
-                    let is_valid = is_valid.unwrap();
-                    if !is_valid {
-                        eprintln!("Invalid signature");
-                        continue;
-                    }
-
-                    if payload.repository.full_name != val.url {
-                        eprintln!("Repository does not match");
-                        continue;
-                    }
-                    if !val.events.iter().any(|x| x == github_event.unwrap().to_str().unwrap()) {
-                        eprintln!("Event does not match");
-                        continue;
-                    }
-
-                    let mut params = HashMap::new();
-                    params.insert(
-                        "github_payload".to_string(),
-                        script::ScriptParameterType::String(body.clone()),
-                    );
-                    let job_result = job.execute(params);
-                    if job_result.is_err() {
-                        eprintln!("Failed to execute job: {}", job_result.unwrap());
-                    } else {
-                        eprintln!("Job started: {}", job_result.unwrap());
-                    }
-                }
-                job::TriggerType::Manual(_) => {}
-            }
+    match serde_yaml::from_str::<job::Job>(&body) {
+        Ok(job) => match job.validate(None, Default::default()) {
+            Ok(_) => StatusCode::OK.into_response(),
+            Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+        },
+        Err(e) => {
+            eprintln!("Failed to parse job YAML: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
         }
     }
+}
 
-    StatusCode::OK
+pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
+    match job::Job::get_all() {
+        Ok(jobs) => {
+            for job in jobs {
+                for trigger in job.triggers.iter() {
+                    match trigger {
+                        job::TriggerType::Github(val) => {
+                            let signature = headers.get("x-hub-signature-256");
+                            let github_event = headers.get("x-github-event");
+
+                            if signature.is_none() || github_event.is_none() {
+                                eprintln!("Signature or Event not found in headers");
+                                continue;
+                            }
+
+                            let payload = match serde_json::from_str::<job::GithubPayload>(&body) {
+                                Ok(p) => p,
+                                Err(e) => {
+                                    eprintln!("Failed to parse GitHub payload: {}", e);
+                                    continue;
+                                }
+                            };
+
+                            match credential::Credential::get(val.secret_credential_id.as_str(), None) {
+                                Ok(Some(credential)) => {
+                                    let text_credential = match credential.value {
+                                        credential::CredentialType::Text(val) => Some(val),
+                                        _ => {
+                                            eprintln!("Credential is not Text: {}", val.secret_credential_id);
+                                            None
+                                        }
+                                    };
+
+                                    if let Some(text_credential) = text_credential {
+                                        match is_signature_valid(
+                                            &body,
+                                            signature.unwrap().to_str().unwrap(),
+                                            &text_credential.value,
+                                        ) {
+                                            Ok(is_valid) => {
+                                                if !is_valid {
+                                                    eprintln!("Invalid signature");
+                                                    continue;
+                                                }
+
+                                                if payload.repository.full_name != val.url {
+                                                    eprintln!("Repository does not match");
+                                                    continue;
+                                                }
+
+                                                if !val
+                                                    .events
+                                                    .iter()
+                                                    .any(|x| x == github_event.unwrap().to_str().unwrap())
+                                                {
+                                                    eprintln!("Event does not match");
+                                                    continue;
+                                                }
+
+                                                let mut params = HashMap::new();
+                                                params.insert(
+                                                    "github_payload".to_string(),
+                                                    script::ScriptParameterType::String(body.clone()),
+                                                );
+
+                                                match job.execute(params) {
+                                                    Ok(result) => eprintln!("Job started: {}", result),
+                                                    Err(e) => eprintln!("Failed to execute job: {}", e),
+                                                }
+                                            }
+                                            Err(e) => eprintln!("Failed to validate signature: {}", e),
+                                        }
+                                    }
+                                }
+                                Ok(None) => eprintln!("Credential not found: {}", val.secret_credential_id),
+                                Err(e) => eprintln!("Failed to get credential: {}", e),
+                            }
+                        }
+                        job::TriggerType::Manual(_) => {}
+                    }
+                }
+            }
+            StatusCode::OK.into_response()
+        }
+        Err(e) => {
+            eprintln!("Failed to get jobs for webhook trigger: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 pub async fn get_job_trigger_types() -> Response {
-    let job_trigger_types = job::TriggerType::get_json_schema();
-    if job_trigger_types.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match job::TriggerType::get_json_schema() {
+        Ok(types) => Json(types).into_response(),
+        Err(e) => {
+            eprintln!("Failed to get job trigger types: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    Json(job_trigger_types.unwrap()).into_response()
 }
 
 #[derive(Deserialize)]
@@ -338,22 +356,22 @@ pub struct JobResultsQuery {
 }
 
 pub async fn get_job_results(query: Query<JobResultsQuery>) -> Response {
-    let job_results = job::JobResult::get_all(query.job_id.clone());
-    if job_results.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match job::JobResult::get_all(query.job_id.clone()) {
+        Ok(results) => Json(results).into_response(),
+        Err(e) => {
+            eprintln!("Failed to get job results: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    Json(job_results.unwrap()).into_response()
 }
 
-pub async fn get_job_result(Path(id): Path<String>) -> (StatusCode, Json<job::JobResult>) {
-    let job_result = job::JobResult::get(id.as_str());
-    if job_result.is_err() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(job::JobResult::create_dummy()));
+pub async fn get_job_result(Path(id): Path<String>) -> Response {
+    match job::JobResult::get(id.as_str()) {
+        Ok(Some(result)) => Json(result).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(job::JobResult::create_dummy())).into_response(),
+        Err(e) => {
+            eprintln!("Failed to get job result {}: {}", id, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(job::JobResult::create_dummy())).into_response()
+        }
     }
-    let job_result = job_result.unwrap();
-    if job_result.is_none() {
-        return (StatusCode::NOT_FOUND, Json(job::JobResult::create_dummy()));
-    }
-
-    (StatusCode::OK, Json(job_result.unwrap()))
 }
