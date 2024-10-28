@@ -1,13 +1,10 @@
-use std::{collections::HashMap, path::Path};
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    job::JobResult,
     log::LogLevel,
     script::{
         utils::{ParameterSubstitution, SubstitutionResult},
-        ScriptExecutor, ScriptParameterType,
+        ScriptExecutionContext, ScriptExecutor,
     },
     utils::execute_command,
 };
@@ -18,15 +15,9 @@ pub struct BashScript {
 }
 
 impl ScriptExecutor for BashScript {
-    fn execute(
-        &self,
-        parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &Path,
-        _step_name: &str,
-        job_result: &mut JobResult,
-    ) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext) -> Result<(), String> {
         // Replace all parameter references in the code
-        let replaced_code = self.code.substitute_parameters(parameters, false)?;
+        let replaced_code = self.code.substitute_parameters(context.parameters, false)?;
         let replaced_code = match replaced_code {
             Some(code) => match code {
                 SubstitutionResult::Single(s) => s,
@@ -45,9 +36,11 @@ impl ScriptExecutor for BashScript {
                 i += 1;
                 continue;
             }
-            job_result.add_log(LogLevel::Info, format!("command: {}", original_lines[i]));
-            if !job_result.dry_run {
-                execute_command(line, directory, job_result)?;
+            context
+                .job_result
+                .add_log(LogLevel::Info, format!("command: {}", original_lines[i]));
+            if !context.job_result.dry_run {
+                execute_command(line, context.directory, context.job_result)?;
             }
             i += 1;
         }

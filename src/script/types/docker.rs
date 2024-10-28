@@ -1,17 +1,13 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     credential::{Credential, CredentialType},
     docker::{docker_build, docker_run, docker_stop_and_rm},
-    job::JobResult,
     script::{
         utils::{ParameterSubstitution, SubstitutionResult},
-        ScriptExecutor, ScriptParameterType,
+        ScriptExecutionContext, ScriptExecutor,
     },
 };
 
@@ -22,17 +18,11 @@ pub struct DockerBuildScript {
 }
 
 impl ScriptExecutor for DockerBuildScript {
-    fn execute(
-        &self,
-        parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &Path,
-        _step_name: &str,
-        job_result: &mut JobResult,
-    ) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext) -> Result<(), String> {
         // Get image name with parameter substitution
         let image = self
             .image
-            .substitute_parameters(parameters, false)?
+            .substitute_parameters(context.parameters, false)?
             .ok_or("Image name is required")?;
         let image = match image {
             SubstitutionResult::Single(s) => s,
@@ -45,7 +35,7 @@ impl ScriptExecutor for DockerBuildScript {
         let dockerfile = match &self.dockerfile {
             Some(dockerfile) => {
                 match dockerfile
-                    .substitute_parameters(parameters, false)?
+                    .substitute_parameters(context.parameters, false)?
                     .ok_or("Dockerfile path is required")?
                 {
                     SubstitutionResult::Single(s) => s,
@@ -61,21 +51,21 @@ impl ScriptExecutor for DockerBuildScript {
             if dockerfile.chars().nth(1) == Some(':') {
                 PathBuf::from(dockerfile)
             } else {
-                directory.join(dockerfile)
+                context.directory.join(dockerfile)
             }
         } else if dockerfile.starts_with('/') {
             PathBuf::from(dockerfile)
         } else {
-            directory.join(dockerfile)
+            context.directory.join(dockerfile)
         };
 
-        if !job_result.dry_run && !dockerfile_path.exists() {
+        if !context.job_result.dry_run && !dockerfile_path.exists() {
             return Err(format!(
                 "Dockerfile does not exist at path: {}",
                 dockerfile_path.display()
             ));
         }
-        docker_build(&image, &dockerfile_path, directory, job_result)
+        docker_build(&image, &dockerfile_path, context.directory, context.job_result)
     }
 }
 
@@ -86,17 +76,11 @@ pub struct DockerStopScript {
 }
 
 impl ScriptExecutor for DockerStopScript {
-    fn execute(
-        &self,
-        parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &Path,
-        _step_name: &str,
-        job_result: &mut JobResult,
-    ) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext) -> Result<(), String> {
         // Get container name with parameter substitution
         let container = self
             .container
-            .substitute_parameters(parameters, false)?
+            .substitute_parameters(context.parameters, false)?
             .ok_or("Container name is required")?;
         let container = match container {
             SubstitutionResult::Single(s) => s,
@@ -105,7 +89,7 @@ impl ScriptExecutor for DockerStopScript {
             }
         };
 
-        docker_stop_and_rm(&container, directory, job_result);
+        docker_stop_and_rm(&container, context.directory, context.job_result);
         Ok(())
     }
 }
@@ -125,17 +109,11 @@ pub struct DockerRunScript {
 }
 
 impl ScriptExecutor for DockerRunScript {
-    fn execute(
-        &self,
-        parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &Path,
-        _step_name: &str,
-        job_result: &mut JobResult,
-    ) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext) -> Result<(), String> {
         // Get image name with parameter substitution
         let image = self
             .image
-            .substitute_parameters(parameters, false)?
+            .substitute_parameters(context.parameters, false)?
             .ok_or("Image name is required")?;
         let image = match image {
             SubstitutionResult::Single(s) => s,
@@ -149,7 +127,7 @@ impl ScriptExecutor for DockerRunScript {
         // Add container name if specified
         if let Some(container_name) = &self.container {
             let name = container_name
-                .substitute_parameters(parameters, false)?
+                .substitute_parameters(context.parameters, false)?
                 .ok_or("Container name substitution failed")?;
             let name = match name {
                 SubstitutionResult::Single(s) => s,
@@ -166,7 +144,7 @@ impl ScriptExecutor for DockerRunScript {
             match arg {
                 DockerRunArg::Direct(arg_str) => {
                     let processed_arg = arg_str
-                        .substitute_parameters(parameters, false)?
+                        .substitute_parameters(context.parameters, false)?
                         .ok_or("Argument substitution failed")?;
                     match processed_arg {
                         SubstitutionResult::Single(s) => final_args.push(s),
@@ -178,9 +156,9 @@ impl ScriptExecutor for DockerRunScript {
                     }
                 }
                 DockerRunArg::EnvFromCredential { credential_id } => {
-                    let credential_id_resolved = credential_id.substitute_parameters(parameters, true)?;
+                    let credential_id_resolved = credential_id.substitute_parameters(context.parameters, true)?;
                     if let Some(SubstitutionResult::Single(id)) = credential_id_resolved {
-                        if let Some(credential) = Credential::get(&id, Some(job_result))? {
+                        if let Some(credential) = Credential::get(&id, Some(context.job_result))? {
                             match credential.value {
                                 CredentialType::Env(env) => {
                                     for line in env.value.lines() {
@@ -204,6 +182,6 @@ impl ScriptExecutor for DockerRunScript {
         // Convert to &str for docker_run function
         let args_ref: Vec<&str> = final_args.iter().map(|s| s.as_str()).collect();
 
-        docker_run(&image, args_ref, directory, job_result)
+        docker_run(&image, args_ref, context.directory, context.job_result)
     }
 }

@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     job::models::{Job, JobResult},
-    script::{models::Script, ScriptExecutor, ScriptParameterType},
+    script::{models::Script, ScriptExecutionContext, ScriptExecutor, ScriptParameterType},
 };
 
 pub struct JobExecutor;
@@ -54,7 +54,13 @@ impl JobExecutor {
 
             let step_name = current_step.name.clone();
 
-            if let Err(e) = current_step.execute(parameters, directory, &step_name, job_result) {
+            let mut context = ScriptExecutionContext {
+                parameters,
+                directory,
+                step_name: &step_name,
+                job_result,
+            };
+            if let Err(e) = current_step.execute(&mut context) {
                 let message = format!("Error in step {}: {}", step_name, e);
                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
                 job_result.finish_step(false)?;

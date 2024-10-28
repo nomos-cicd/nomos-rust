@@ -1,16 +1,12 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     git::git_clone,
-    job::JobResult,
     script::{
         utils::{ParameterSubstitution, SubstitutionResult},
-        ScriptExecutor, ScriptParameterType,
+        ScriptExecutionContext, ScriptExecutor, ScriptParameterType,
     },
 };
 
@@ -22,17 +18,11 @@ pub struct GitCloneScript {
 }
 
 impl ScriptExecutor for GitCloneScript {
-    fn execute(
-        &self,
-        parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &Path,
-        step_name: &str,
-        job_result: &mut JobResult,
-    ) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext) -> Result<(), String> {
         // Substitute parameters
         let url = self
             .url
-            .substitute_parameters(parameters, false)?
+            .substitute_parameters(context.parameters, false)?
             .ok_or("URL is required")?;
         let url = match url {
             SubstitutionResult::Single(s) => s,
@@ -42,7 +32,7 @@ impl ScriptExecutor for GitCloneScript {
         };
 
         let credential_id = match &self.credential_id {
-            Some(id) => id.substitute_parameters(parameters, true)?,
+            Some(id) => id.substitute_parameters(context.parameters, true)?,
             None => None,
         };
         let credential_id = match credential_id {
@@ -57,7 +47,7 @@ impl ScriptExecutor for GitCloneScript {
 
         let branch: String = match &self.branch {
             Some(b) => {
-                let branch = b.substitute_parameters(parameters, false)?;
+                let branch = b.substitute_parameters(context.parameters, false)?;
                 match branch {
                     Some(b) => match b {
                         SubstitutionResult::Single(s) => s,
@@ -71,10 +61,16 @@ impl ScriptExecutor for GitCloneScript {
             None => "main".to_string(),
         };
 
-        git_clone(&url, branch.as_str(), directory, credential_id.as_deref(), job_result)?;
+        git_clone(
+            &url,
+            branch.as_str(),
+            context.directory,
+            credential_id.as_deref(),
+            context.job_result,
+        )?;
 
         let mut new_dir = match url.split('/').last() {
-            Some(last_part) => directory.join(last_part),
+            Some(last_part) => context.directory.join(last_part),
             None => return Err("Invalid URL format".to_string()),
         };
 
@@ -94,8 +90,8 @@ impl ScriptExecutor for GitCloneScript {
             None => return Err("Invalid directory path".to_string()),
         };
 
-        parameters.insert(
-            format!("steps.{}.git-clone.directory", step_name),
+        context.parameters.insert(
+            format!("steps.{}.git-clone.directory", context.step_name),
             ScriptParameterType::String(new_dir_str.to_string()),
         );
 

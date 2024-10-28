@@ -6,8 +6,8 @@ pub mod utils;
 
 use std::path::PathBuf;
 
-pub use executor::ScriptExecutor;
-pub use parameter::{ScriptParameter, ScriptParameterType};
+pub use executor::*;
+pub use parameter::*;
 
 pub fn default_scripts_location() -> Result<PathBuf, String> {
     let path = if cfg!(target_os = "windows") {

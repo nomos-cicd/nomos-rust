@@ -1,15 +1,11 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    job::JobResult,
     script::{
         utils::{ParameterSubstitution, SubstitutionResult},
-        ScriptExecutor, ScriptParameterType,
+        ScriptExecutionContext, ScriptExecutor,
     },
     settings,
 };
@@ -21,17 +17,11 @@ pub struct SyncScript {
 }
 
 impl ScriptExecutor for SyncScript {
-    fn execute(
-        &self,
-        parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &Path,
-        _step_name: &str,
-        job_result: &mut JobResult,
-    ) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext) -> Result<(), String> {
         // Get directory with parameter substitution
         let param_directory_str = self
             .directory
-            .substitute_parameters(parameters, false)?
+            .substitute_parameters(context.parameters, false)?
             .ok_or("Directory is required")?;
         let param_directory_str = match param_directory_str {
             SubstitutionResult::Single(s) => s,
@@ -42,14 +32,14 @@ impl ScriptExecutor for SyncScript {
 
         let mut param_directory = PathBuf::from(param_directory_str);
 
-        if !job_result.dry_run && !param_directory.exists() {
+        if !context.job_result.dry_run && !param_directory.exists() {
             return Err(format!("Directory does not exist: {:?}", param_directory));
         }
 
         if param_directory.is_relative() {
-            param_directory = directory.join(param_directory);
+            param_directory = context.directory.join(param_directory);
         }
 
-        settings::sync(param_directory, job_result)
+        settings::sync(param_directory, context.job_result)
     }
 }
