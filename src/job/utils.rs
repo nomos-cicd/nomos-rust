@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::JobResult;
+use super::models::JobResult;
 
 pub fn default_job_results_location() -> Result<PathBuf, String> {
     let path = if cfg!(target_os = "windows") {

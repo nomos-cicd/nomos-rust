@@ -8,12 +8,10 @@ use std::{
 };
 
 use crate::{
-    job::next_job_result_id,
+    job::{models::Job, utils::default_job_results_location},
     log::{JobLogger, LogLevel},
     script::models::{Script, ScriptStep},
 };
-
-use super::{default_job_results_location, Job};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobResult {
@@ -31,7 +29,13 @@ pub struct JobResult {
 }
 
 impl JobResult {
-    fn new(id: String, job_id: String, steps: Vec<ScriptStep>, logger: Arc<Mutex<JobLogger>>, dry_run: bool) -> Self {
+    pub fn new(
+        id: String,
+        job_id: String,
+        steps: Vec<ScriptStep>,
+        logger: Arc<Mutex<JobLogger>>,
+        dry_run: bool,
+    ) -> Self {
         let now = Utc::now();
         Self {
             id,
@@ -197,7 +201,7 @@ impl TryFrom<&Job> for JobResult {
     type Error = String;
 
     fn try_from(job: &Job) -> Result<Self, Self::Error> {
-        let id = next_job_result_id()?;
+        let id = crate::job::utils::next_job_result_id()?;
         let script =
             Script::get(&job.script_id)?.ok_or_else(|| format!("Script with id '{}' not found", job.script_id))?;
 
@@ -213,7 +217,7 @@ impl TryFrom<(&Job, &Script, bool)> for JobResult {
 
     fn try_from((job, script, dry_mode): (&Job, &Script, bool)) -> Result<Self, Self::Error> {
         let id = if !dry_mode {
-            next_job_result_id()?
+            crate::job::utils::next_job_result_id()?
         } else {
             "dry_run".to_string()
         };
@@ -238,80 +242,6 @@ impl Clone for JobResult {
             finished_at: self.finished_at,
             logger: Arc::clone(&self.logger),
             dry_run: self.dry_run,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    mod job_result_test {
-        use super::*;
-
-        #[test]
-        fn test_new_job_result() {
-            let steps = vec![ScriptStep {
-                name: "step1".to_string(),
-                ..Default::default()
-            }];
-
-            let logger = Arc::new(Mutex::new(
-                JobLogger::new("test-job".to_string(), "test-id".to_string(), false).unwrap(),
-            ));
-
-            let result = JobResult::new(
-                "test-id".to_string(),
-                "test-job".to_string(),
-                steps.clone(),
-                logger,
-                false,
-            );
-
-            assert_eq!(result.id, "test-id");
-            assert_eq!(result.job_id, "test-job");
-            assert_eq!(result.steps, steps);
-            assert_eq!(result.current_step_name, Some("step1".to_string()));
-            assert!(!result.is_success);
-            assert!(!result.dry_run);
-        }
-
-        #[test]
-        fn test_get_current_step_mut() {
-            let mut result = JobResult::new(
-                "test-id".to_string(),
-                "test-job".to_string(),
-                vec![ScriptStep {
-                    name: "step1".to_string(),
-                    ..Default::default()
-                }],
-                Arc::new(Mutex::new(
-                    JobLogger::new("test-job".to_string(), "test-id".to_string(), false).unwrap(),
-                )),
-                false,
-            );
-
-            let step = result.get_current_step_mut();
-            assert!(step.is_some());
-            assert_eq!(step.unwrap().name, "step1");
-        }
-
-        #[test]
-        fn test_start_step() {
-            let mut result = JobResult::new(
-                "test-id".to_string(),
-                "test-job".to_string(),
-                vec![ScriptStep {
-                    name: "step1".to_string(),
-                    ..Default::default()
-                }],
-                Arc::new(Mutex::new(
-                    JobLogger::new("test-job".to_string(), "test-id".to_string(), true).unwrap(),
-                )),
-                true, // dry_run to avoid file operations
-            );
-
-            assert!(result.start_step().is_ok());
         }
     }
 }

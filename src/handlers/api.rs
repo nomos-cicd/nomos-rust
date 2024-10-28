@@ -9,14 +9,14 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    credential::{self, Credential},
-    job,
-    script::{self, models::Script},
+    credential::{Credential, CredentialType},
+    job::{GithubPayload, Job, JobResult, TriggerType},
+    script::{models::Script, ScriptParameterType},
     utils::is_signature_valid,
 };
 
 pub async fn get_credentials() -> Response {
-    match credential::Credential::get_all() {
+    match Credential::get_all() {
         Ok(credentials) => Json(credentials).into_response(),
         Err(e) => {
             eprintln!("Failed to get credentials: {}", e);
@@ -26,7 +26,7 @@ pub async fn get_credentials() -> Response {
 }
 
 pub async fn get_credential(Path(id): Path<String>) -> Response {
-    match credential::Credential::get(id.as_str(), None) {
+    match Credential::get(id.as_str(), None) {
         Ok(Some(credential)) => Json(credential).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
@@ -37,7 +37,7 @@ pub async fn get_credential(Path(id): Path<String>) -> Response {
 }
 
 pub async fn create_credential(Json(credential): Json<Credential>) -> Response {
-    match credential::Credential::try_from(credential) {
+    match Credential::try_from(credential) {
         Ok(credential) => match credential.sync(&mut None) {
             Ok(_) => Json(credential).into_response(),
             Err(e) => {
@@ -53,7 +53,7 @@ pub async fn create_credential(Json(credential): Json<Credential>) -> Response {
 }
 
 pub async fn delete_credential(Path(id): Path<String>) -> Response {
-    match credential::Credential::get(id.as_str(), None) {
+    match Credential::get(id.as_str(), None) {
         Ok(Some(credential)) => match credential.delete() {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => {
@@ -70,7 +70,7 @@ pub async fn delete_credential(Path(id): Path<String>) -> Response {
 }
 
 pub async fn get_credential_types() -> Response {
-    Json(credential::CredentialType::get_json_schema()).into_response()
+    Json(CredentialType::get_json_schema()).into_response()
 }
 
 pub async fn get_scripts() -> Response {
@@ -137,7 +137,7 @@ pub async fn delete_script(Path(id): Path<String>) -> Response {
 }
 
 pub async fn get_script_parameter_types() -> Response {
-    match script::ScriptParameterType::get_json_schema() {
+    match ScriptParameterType::get_json_schema() {
         Ok(types) => Json(types).into_response(),
         Err(e) => {
             eprintln!("Failed to get script parameter types: {}", e);
@@ -147,7 +147,7 @@ pub async fn get_script_parameter_types() -> Response {
 }
 
 pub async fn get_jobs() -> Response {
-    match job::Job::get_all() {
+    match Job::get_all() {
         Ok(jobs) => Json(jobs).into_response(),
         Err(e) => {
             eprintln!("Failed to get jobs: {}", e);
@@ -157,7 +157,7 @@ pub async fn get_jobs() -> Response {
 }
 
 pub async fn get_job(Path(id): Path<String>) -> Response {
-    match job::Job::get(id.as_str()) {
+    match Job::get(id.as_str()) {
         Ok(Some(job)) => Json(job).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
@@ -177,7 +177,7 @@ pub async fn create_job(headers: HeaderMap, body: String) -> Response {
         return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
     }
 
-    match serde_yaml::from_str::<job::Job>(&body) {
+    match serde_yaml::from_str::<Job>(&body) {
         Ok(job) => match job.sync(None) {
             Ok(_) => (StatusCode::CREATED, job.id).into_response(),
             Err(e) => {
@@ -193,7 +193,7 @@ pub async fn create_job(headers: HeaderMap, body: String) -> Response {
 }
 
 pub async fn delete_job(Path(id): Path<String>) -> Response {
-    match job::Job::get(id.as_str()) {
+    match Job::get(id.as_str()) {
         Ok(Some(job)) => match job.delete() {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => {
@@ -210,7 +210,7 @@ pub async fn delete_job(Path(id): Path<String>) -> Response {
 }
 
 pub async fn execute_job(Path(id): Path<String>) -> Response {
-    match job::Job::get(id.as_str()) {
+    match Job::get(id.as_str()) {
         Ok(Some(job)) => match job.execute(Default::default()) {
             Ok(result) => (StatusCode::OK, result).into_response(),
             Err(e) => {
@@ -236,7 +236,7 @@ pub async fn dry_run_job(headers: HeaderMap, body: String) -> Response {
         return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
     }
 
-    match serde_yaml::from_str::<job::Job>(&body) {
+    match serde_yaml::from_str::<Job>(&body) {
         Ok(job) => match job.validate(None, Default::default()) {
             Ok(_) => StatusCode::OK.into_response(),
             Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
@@ -249,12 +249,12 @@ pub async fn dry_run_job(headers: HeaderMap, body: String) -> Response {
 }
 
 pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
-    match job::Job::get_all() {
+    match Job::get_all() {
         Ok(jobs) => {
             for job in jobs {
                 for trigger in job.triggers.iter() {
                     match trigger {
-                        job::TriggerType::Github(val) => {
+                        TriggerType::Github(val) => {
                             let signature = headers.get("x-hub-signature-256");
                             let github_event = headers.get("x-github-event");
 
@@ -263,7 +263,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
                                 continue;
                             }
 
-                            let payload = match serde_json::from_str::<job::GithubPayload>(&body) {
+                            let payload = match serde_json::from_str::<GithubPayload>(&body) {
                                 Ok(p) => p,
                                 Err(e) => {
                                     eprintln!("Failed to parse GitHub payload: {}", e);
@@ -271,10 +271,10 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
                                 }
                             };
 
-                            match credential::Credential::get(val.secret_credential_id.as_str(), None) {
+                            match Credential::get(val.secret_credential_id.as_str(), None) {
                                 Ok(Some(credential)) => {
                                     let text_credential = match credential.value {
-                                        credential::CredentialType::Text(val) => Some(val),
+                                        CredentialType::Text(val) => Some(val),
                                         _ => {
                                             eprintln!("Credential is not Text: {}", val.secret_credential_id);
                                             None
@@ -310,7 +310,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
                                                 let mut params = HashMap::new();
                                                 params.insert(
                                                     "github_payload".to_string(),
-                                                    script::ScriptParameterType::String(body.clone()),
+                                                    ScriptParameterType::String(body.clone()),
                                                 );
 
                                                 match job.execute(params) {
@@ -326,7 +326,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
                                 Err(e) => eprintln!("Failed to get credential: {}", e),
                             }
                         }
-                        job::TriggerType::Manual(_) => {}
+                        TriggerType::Manual(_) => {}
                     }
                 }
             }
@@ -340,7 +340,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
 }
 
 pub async fn get_job_trigger_types() -> Response {
-    match job::TriggerType::get_json_schema() {
+    match TriggerType::get_json_schema() {
         Ok(types) => Json(types).into_response(),
         Err(e) => {
             eprintln!("Failed to get job trigger types: {}", e);
@@ -356,7 +356,7 @@ pub struct JobResultsQuery {
 }
 
 pub async fn get_job_results(query: Query<JobResultsQuery>) -> Response {
-    match job::JobResult::get_all(query.job_id.clone()) {
+    match JobResult::get_all(query.job_id.clone()) {
         Ok(results) => Json(results).into_response(),
         Err(e) => {
             eprintln!("Failed to get job results: {}", e);
@@ -366,12 +366,12 @@ pub async fn get_job_results(query: Query<JobResultsQuery>) -> Response {
 }
 
 pub async fn get_job_result(Path(id): Path<String>) -> Response {
-    match job::JobResult::get(id.as_str()) {
+    match JobResult::get(id.as_str()) {
         Ok(Some(result)) => Json(result).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, Json(job::JobResult::create_dummy())).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(JobResult::create_dummy())).into_response(),
         Err(e) => {
             eprintln!("Failed to get job result {}: {}", id, e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(job::JobResult::create_dummy())).into_response()
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(JobResult::create_dummy())).into_response()
         }
     }
 }
