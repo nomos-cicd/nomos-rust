@@ -1,6 +1,5 @@
 use once_cell::sync::Lazy;
 use std::{
-    error::Error,
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
     path::PathBuf,
@@ -63,13 +62,13 @@ static JOB_RESULTS: Lazy<Arc<Mutex<File>>> = Lazy::new(|| {
 });
 
 /// Reads .../nomos/ids.txt and returns the next job id
-pub fn next_job_result_id() -> Result<String, Box<dyn Error>> {
+pub fn next_job_result_id() -> Result<String, String> {
     let binding = Arc::clone(&JOB_RESULTS);
     let mut file = binding.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut content = String::new();
-    file.seek(SeekFrom::Start(0))?;
-    file.read_to_string(&mut content)?;
+    file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+    file.read_to_string(&mut content).map_err(|e| e.to_string())?;
 
     let id = content.trim().parse::<u64>().unwrap_or(0);
 
@@ -78,10 +77,11 @@ pub fn next_job_result_id() -> Result<String, Box<dyn Error>> {
         next_id += 1;
     }
 
-    file.seek(SeekFrom::Start(0))?;
-    file.set_len(0)?;
-    file.write_all(next_id.to_string().as_bytes())?;
-    file.flush()?;
+    file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+    file.set_len(0).map_err(|e| e.to_string())?;
+    file.write_all(next_id.to_string().as_bytes())
+        .map_err(|e| e.to_string())?;
+    file.flush().map_err(|e| e.to_string())?;
 
     Ok(next_id.to_string())
 }
