@@ -122,6 +122,6 @@ fn validation() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        "Error in step Test Step: \"Parameter 'missing.param' not found\""
+        "Error in step Test Step: Parameter 'missing.param' not found"
     );
 }

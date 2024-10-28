@@ -72,64 +72,68 @@ impl ParameterSubstitution for String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_parameter_substitution() {
-        let mut parameters = HashMap::new();
-        parameters.insert(
-            "parameters.param1".to_string(),
-            ScriptParameterType::String("value1".to_string()),
-        );
-        parameters.insert(
-            "steps.step1.value".to_string(),
-            ScriptParameterType::String("step_value".to_string()),
-        );
-        parameters.insert(
-            "env.VERSION".to_string(),
-            ScriptParameterType::String("1.0.0".to_string()),
-        );
-        parameters.insert(
-            "array.param".to_string(),
-            ScriptParameterType::StringArray(vec!["a".to_string(), "b".to_string(), "c".to_string()]),
-        );
+    mod parameter_substitution_tests {
+        use super::*;
 
-        // Test string parameter
-        let input = "$(parameters.param1)".to_string();
-        assert_eq!(
-            input.substitute_parameters(&parameters, false).unwrap().unwrap(),
-            SubstitutionResult::Single("value1".to_string())
-        );
+        #[test]
+        fn test_parameter_substitution() {
+            let mut parameters = HashMap::new();
+            parameters.insert(
+                "parameters.param1".to_string(),
+                ScriptParameterType::String("value1".to_string()),
+            );
+            parameters.insert(
+                "steps.step1.value".to_string(),
+                ScriptParameterType::String("step_value".to_string()),
+            );
+            parameters.insert(
+                "env.VERSION".to_string(),
+                ScriptParameterType::String("1.0.0".to_string()),
+            );
+            parameters.insert(
+                "array.param".to_string(),
+                ScriptParameterType::StringArray(vec!["a".to_string(), "b".to_string(), "c".to_string()]),
+            );
 
-        // Test array parameter
-        let input = "$(array.param)".to_string();
-        assert_eq!(
-            input.substitute_parameters(&parameters, false).unwrap().unwrap(),
-            SubstitutionResult::Multiple(vec!["a".to_string(), "b".to_string(), "c".to_string()])
-        );
+            // Test string parameter
+            let input = "$(parameters.param1)".to_string();
+            assert_eq!(
+                input.substitute_parameters(&parameters, false).unwrap().unwrap(),
+                SubstitutionResult::Single("value1".to_string())
+            );
 
-        // Test array parameter with additional text (should join array)
-        let input = "prefix_$(array.param)_suffix".to_string();
-        assert_eq!(
-            input.substitute_parameters(&parameters, false).unwrap().unwrap(),
-            SubstitutionResult::Single("prefix_a, b, c_suffix".to_string())
-        );
+            // Test array parameter
+            let input = "$(array.param)".to_string();
+            assert_eq!(
+                input.substitute_parameters(&parameters, false).unwrap().unwrap(),
+                SubstitutionResult::Multiple(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+            );
 
-        // Test multiple parameters with different prefixes
-        let input = "$(parameters.param1)_$(env.VERSION)".to_string();
-        assert_eq!(
-            input.substitute_parameters(&parameters, false).unwrap().unwrap(),
-            SubstitutionResult::Single("value1_1.0.0".to_string())
-        );
+            // Test array parameter with additional text (should join array)
+            let input = "prefix_$(array.param)_suffix".to_string();
+            assert_eq!(
+                input.substitute_parameters(&parameters, false).unwrap().unwrap(),
+                SubstitutionResult::Single("prefix_a, b, c_suffix".to_string())
+            );
 
-        // Test optional parameter
-        let input = "$(unknown.param)".to_string();
-        assert_eq!(input.substitute_parameters(&parameters, true).unwrap(), None);
+            // Test multiple parameters with different prefixes
+            let input = "$(parameters.param1)_$(env.VERSION)".to_string();
+            assert_eq!(
+                input.substitute_parameters(&parameters, false).unwrap().unwrap(),
+                SubstitutionResult::Single("value1_1.0.0".to_string())
+            );
 
-        // Test missing parameter
-        let input = "$(missing.param)".to_string();
-        assert!(input.substitute_parameters(&parameters, false).is_err());
+            // Test optional parameter
+            let input = "$(unknown.param)".to_string();
+            assert_eq!(input.substitute_parameters(&parameters, true).unwrap(), None);
 
-        // Test missing closing bracket
-        let input = "$(env.VERSION".to_string();
-        assert!(input.substitute_parameters(&parameters, false).is_err());
+            // Test missing parameter
+            let input = "$(missing.param)".to_string();
+            assert!(input.substitute_parameters(&parameters, false).is_err());
+
+            // Test missing closing bracket
+            let input = "$(env.VERSION".to_string();
+            assert!(input.substitute_parameters(&parameters, false).is_err());
+        }
     }
 }

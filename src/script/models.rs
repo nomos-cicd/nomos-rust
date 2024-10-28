@@ -16,7 +16,7 @@ pub struct Script {
     pub steps: Vec<YamlScriptStep>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct ScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
