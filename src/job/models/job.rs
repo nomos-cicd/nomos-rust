@@ -218,3 +218,134 @@ impl From<&Script> for Job {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::script::models::YamlScriptStep;
+
+    #[test]
+    fn test_validate_parameters() {
+        let job = Job {
+            id: "test_job".to_string(),
+            name: "Test Job".to_string(),
+            parameters: vec![
+                JobParameterDefinition {
+                    name: "param1".to_string(),
+                    default: None,
+                },
+            ],
+            triggers: vec![],
+            script_id: "test_script".to_string(),
+            read_only: false,
+        };
+
+        let script = Script {
+            id: "test_script".to_string(),
+            name: "Test Script".to_string(),
+            parameters: vec![
+                ScriptParameter {
+                    name: "param1".to_string(),
+                    description: "Parameter 1".to_string(),
+                    default: None,
+                    required: true,
+                },
+                ScriptParameter {
+                    name: "param2".to_string(),
+                    description: "Parameter 2".to_string(),
+                    default: None,
+                    required: true,
+                },
+            ],
+            steps: vec![YamlScriptStep::default()],
+        };
+
+        let result = job.validate_parameters(Some(&script));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Missing required parameters: param2");
+    }
+
+    #[test]
+    fn test_merged_parameters() {
+        let job = Job {
+            id: "test_job".to_string(),
+            name: "Test Job".to_string(),
+            parameters: vec![
+                JobParameterDefinition {
+                    name: "param1".to_string(),
+                    default: Some(ScriptParameterType::String("default1".to_string())),
+                },
+            ],
+            triggers: vec![],
+            script_id: "test_script".to_string(),
+            read_only: false,
+        };
+
+        let script = Script {
+            id: "test_script".to_string(),
+            name: "Test Script".to_string(),
+            parameters: vec![
+                ScriptParameter {
+                    name: "param1".to_string(),
+                    description: "Parameter 1".to_string(),
+                    default: None,
+                    required: true,
+                },
+                ScriptParameter {
+                    name: "param2".to_string(),
+                    description: "Parameter 2".to_string(),
+                    default: Some(ScriptParameterType::String("default2".to_string())),
+                    required: false,
+                },
+            ],
+            steps: vec![YamlScriptStep::default()],
+        };
+
+        let provided_params = HashMap::from([
+            ("param1".to_string(), ScriptParameterType::String("value1".to_string())),
+        ]);
+
+        let result = job.merged_parameters(Some(&script), provided_params);
+        assert!(result.is_ok());
+        let merged = result.unwrap();
+        assert_eq!(merged.get("parameters.param1"), Some(&ScriptParameterType::String("value1".to_string())));
+        assert_eq!(merged.get("parameters.param2"), Some(&ScriptParameterType::String("default2".to_string())));
+    }
+
+    #[test]
+    fn test_resolve_parameter_value() {
+        let job = Job {
+            id: "test_job".to_string(),
+            name: "Test Job".to_string(),
+            parameters: vec![
+                JobParameterDefinition {
+                    name: "param1".to_string(),
+                    default: Some(ScriptParameterType::String("default1".to_string())),
+                },
+            ],
+            triggers: vec![],
+            script_id: "test_script".to_string(),
+            read_only: false,
+        };
+
+        let script_param = ScriptParameter {
+            name: "param1".to_string(),
+            description: "Parameter 1".to_string(),
+            default: None,
+            required: true,
+        };
+
+        let provided_params = HashMap::from([
+            ("param1".to_string(), ScriptParameterType::String("value1".to_string())),
+        ]);
+
+        let result = job.resolve_parameter_value(&script_param, &provided_params);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(ScriptParameterType::String("value1".to_string())));
+
+        let empty_params = HashMap::new();
+        let result = job.resolve_parameter_value(&script_param, &empty_params);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(ScriptParameterType::String("default1".to_string())));
+    }
+}
