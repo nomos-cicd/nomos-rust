@@ -22,16 +22,19 @@ pub struct ScriptTemplate<'a> {
 }
 
 pub async fn template_scripts() -> Response {
-    let scripts = Script::get_all();
-    if scripts.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match Script::get_all() {
+        Ok(scripts) => {
+            let template = ScriptsTemplate {
+                title: "Scripts",
+                scripts,
+            };
+            Html(template.render().unwrap()).into_response()
+        }
+        Err(e) => {
+            eprintln!("Failed to get all scripts: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let scripts = scripts.unwrap();
-    let template = ScriptsTemplate {
-        title: "Scripts",
-        scripts,
-    };
-    Html(template.render().unwrap()).into_response()
 }
 
 pub async fn template_update_script(Path(id): Path<String>) -> Response {
@@ -44,14 +47,16 @@ pub async fn template_create_script() -> Response {
 
 pub async fn template_script(id: Option<Path<String>>, title: &str) -> Response {
     let script = if let Some(id) = id {
-        Script::get(id.as_str())
+        match Script::get(id.as_str()) {
+            Ok(script) => script,
+            Err(e) => {
+                eprintln!("Failed to get script {}: {}", id.as_str(), e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
     } else {
-        Ok(None)
+        None
     };
-    if script.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
-    let script = script.unwrap();
 
     let mut script_yaml = None;
     if let Some(script) = script.as_ref() {

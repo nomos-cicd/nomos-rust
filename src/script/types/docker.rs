@@ -184,11 +184,10 @@ impl ScriptExecutor for DockerRunScript {
                             match credential.value {
                                 CredentialType::Env(env) => {
                                     for line in env.value.lines() {
-                                        let key = line.split('=').next();
-                                        if key.is_none() {
-                                            return Err("Invalid env credential".to_string());
-                                        }
-                                        let key = key.unwrap();
+                                        let key = match line.split('=').next() {
+                                            Some(k) => k,
+                                            None => return Err("Invalid env credential: missing key".to_string()),
+                                        };
                                         let value = line[key.len() + 1..].trim();
                                         final_args.push("--env".to_string());
                                         final_args.push(format!("\"{}={}\"", key, value));

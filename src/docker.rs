@@ -22,14 +22,19 @@ pub fn docker_build(
     directory: &Path,
     job_result: &mut JobResult,
 ) -> Result<(), String> {
-    let dockerfile_dir = dockerfile.parent();
-    if dockerfile_dir.is_none() {
-        return Err("Dockerfile directory not found".to_string());
-    }
-    let dockerfile_dir = dockerfile_dir.unwrap();
+    let dockerfile_dir = match dockerfile.parent() {
+        Some(dir) => dir,
+        None => return Err("Dockerfile directory not found".to_string()),
+    };
+
+    let dockerfile_dir_str = match dockerfile_dir.to_str() {
+        Some(dir_str) => dir_str,
+        None => return Err("Failed to convert Dockerfile directory to string".to_string()),
+    };
+
     let command = format!(
         "docker build {} -t {} -f {}",
-        dockerfile_dir.to_str().unwrap(),
+        dockerfile_dir_str,
         image,
         dockerfile.display()
     );

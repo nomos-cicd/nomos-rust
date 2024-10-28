@@ -50,12 +50,10 @@ impl Script {
         for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path: PathBuf = entry.path();
-            let script = Script::try_from(path);
-            if let Err(e) = script {
-                eprintln!("Error reading script: {:?}", e);
-                continue;
+            match Script::try_from(path) {
+                Ok(script) => scripts.push(script),
+                Err(e) => eprintln!("Error reading script: {:?}", e),
             }
-            scripts.push(script.unwrap());
         }
         Ok(scripts)
     }

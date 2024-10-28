@@ -79,28 +79,21 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let script = Script::try_from(path);
-            if let Err(e) = script {
-                job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
-                continue;
+            match Script::try_from(path) {
+                Ok(script) => match script.sync(job_result.into()) {
+                    Ok(_) => script_ids.push(script.id.clone()),
+                    Err(e) => job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e)),
+                },
+                Err(e) => job_result.add_log(LogLevel::Error, format!("Error creating script: {:?}", e)),
             }
-            let script = script.unwrap();
-            let res = script.sync(job_result.into());
-            if let Err(e) = res {
-                job_result.add_log(LogLevel::Error, format!("Error syncing script: {:?}", e));
-                continue;
-            }
-            script_ids.push(script.id.clone());
         }
         let scripts = Script::get_all()?;
         for script in scripts {
             if !script_ids.contains(&script.id) {
-                let res = script.delete();
-                if let Err(e) = res {
-                    job_result.add_log(LogLevel::Error, format!("Error deleting script: {:?}", e));
-                    continue;
+                match script.delete() {
+                    Ok(_) => job_result.add_log(LogLevel::Info, format!("Deleted script {:?}", script.id)),
+                    Err(e) => job_result.add_log(LogLevel::Error, format!("Error deleting script: {:?}", e)),
                 }
-                job_result.add_log(LogLevel::Info, format!("Deleted script {:?}", script.id));
             }
         }
     } else {
@@ -113,32 +106,27 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         for entry in std::fs::read_dir(jobs_path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let job = Job::try_from(path);
-            if let Err(e) = job {
-                job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
-                continue;
+            match Job::try_from(path) {
+                Ok(job) => {
+                    if job.read_only {
+                        job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
+                        continue;
+                    }
+                    match job.sync(job_result.into()) {
+                        Ok(_) => job_ids.push(job.id.clone()),
+                        Err(e) => job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e)),
+                    }
+                }
+                Err(e) => job_result.add_log(LogLevel::Error, format!("Error creating job: {:?}", e)),
             }
-            let job = job.unwrap();
-            if job.read_only {
-                job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
-                continue;
-            }
-            let res = job.sync(job_result.into());
-            if let Err(e) = res {
-                job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e));
-                continue;
-            }
-            job_ids.push(job.id.clone());
         }
         let jobs = Job::get_all()?;
         for job in jobs {
             if !job_ids.contains(&job.id) && !job.read_only {
-                let res = job.delete();
-                if let Err(e) = res {
-                    job_result.add_log(LogLevel::Error, format!("Error deleting job: {:?}", e));
-                    continue;
+                match job.delete() {
+                    Ok(_) => job_result.add_log(LogLevel::Info, format!("Deleted job {:?}", job.id)),
+                    Err(e) => job_result.add_log(LogLevel::Error, format!("Error deleting job: {:?}", e)),
                 }
-                job_result.add_log(LogLevel::Info, format!("Deleted job {:?}", job.id));
             }
         }
     } else {

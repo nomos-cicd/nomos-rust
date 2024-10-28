@@ -18,16 +18,19 @@ pub struct CredentialsTemplate<'a> {
 }
 
 pub async fn template_credentials() -> Response {
-    let credentials = Credential::get_all();
-    if credentials.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    match Credential::get_all() {
+        Ok(credentials) => {
+            let template = CredentialsTemplate {
+                title: "Credentials",
+                credentials,
+            };
+            Html(template.render().unwrap()).into_response()
+        }
+        Err(e) => {
+            eprintln!("Failed to get all credentials: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-    let credentials = credentials.unwrap();
-    let template = CredentialsTemplate {
-        title: "Credentials",
-        credentials,
-    };
-    Html(template.render().unwrap()).into_response()
 }
 
 #[derive(Template)]
@@ -48,14 +51,17 @@ pub async fn template_create_credential() -> Response {
 
 pub async fn template_credential(id: Option<Path<String>>, title: &str) -> Response {
     let credential = if let Some(id) = id {
-        Credential::get(id.as_str(), None)
+        match Credential::get(id.as_str(), None) {
+            Ok(cred) => cred,
+            Err(e) => {
+                eprintln!("Failed to get credential {}: {}", id.as_str(), e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
     } else {
-        Ok(None)
+        None
     };
-    if credential.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
-    let credential = credential.unwrap();
+
     let default_value = CredentialType::from_str("ssh").unwrap();
 
     let credential_value = if let Some(cred) = credential.as_ref() {
@@ -87,24 +93,26 @@ pub struct CredentialValueQuery {
 
 pub async fn template_credential_value(params: Query<CredentialValueQuery>) -> Response {
     if let Some(id) = &params.id {
-        let credential = Credential::get(id.as_str(), None);
-        if credential.is_err() {
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        }
-        let credential = credential.unwrap();
-        if let Some(credential) = credential {
-            if credential.get_credential_type() == params.credential_type {
-                let template = CredentialValueTemplate {
-                    credential_value: &credential.value,
-                };
-                return (StatusCode::OK, Html(template.render().unwrap())).into_response();
+        match Credential::get(id.as_str(), None) {
+            Ok(credential) => {
+                if let Some(credential) = credential {
+                    if credential.get_credential_type() == params.credential_type {
+                        let template = CredentialValueTemplate {
+                            credential_value: &credential.value,
+                        };
+                        return (StatusCode::OK, Html(template.render().unwrap())).into_response();
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to get credential {}: {}", id, e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
             }
         }
     }
 
     let credential_type = CredentialType::from_str(params.credential_type.as_str());
-    if credential_type.is_ok() {
-        let credential_type = credential_type.unwrap();
+    if let Ok(credential_type) = credential_type {
         let template = CredentialValueTemplate {
             credential_value: &credential_type,
         };

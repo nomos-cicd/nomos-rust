@@ -61,32 +61,33 @@ impl PartialEq for Credential {
 impl Credential {
     pub fn get(credential_id: &str, job_result: Option<&mut JobResult>) -> Result<Option<Self>, String> {
         let path = default_credentials_location()?.join(format!("{}.yml", credential_id));
-        let credential = Credential::try_from(path);
-        if credential.is_ok() {
-            let credential = credential.unwrap();
-            if let Some(job_result) = job_result {
-                match &credential.value {
-                    CredentialType::Text(text) => {
-                        if text.value.is_empty() {
-                            job_result.add_log(LogLevel::Warning, format!("Empty text credential: {}", credential_id));
+        match Credential::try_from(path) {
+            Ok(credential) => {
+                if let Some(job_result) = job_result {
+                    match &credential.value {
+                        CredentialType::Text(text) => {
+                            if text.value.is_empty() {
+                                job_result
+                                    .add_log(LogLevel::Warning, format!("Empty text credential: {}", credential_id));
+                            }
                         }
-                    }
-                    CredentialType::Env(env) => {
-                        if env.value.is_empty() {
-                            job_result.add_log(LogLevel::Warning, format!("Empty env credential: {}", credential_id));
+                        CredentialType::Env(env) => {
+                            if env.value.is_empty() {
+                                job_result
+                                    .add_log(LogLevel::Warning, format!("Empty env credential: {}", credential_id));
+                            }
                         }
-                    }
-                    CredentialType::Ssh(ssh) => {
-                        if ssh.username.is_empty() || ssh.private_key.is_empty() {
-                            job_result.add_log(LogLevel::Warning, format!("Empty ssh credential: {}", credential_id));
+                        CredentialType::Ssh(ssh) => {
+                            if ssh.username.is_empty() || ssh.private_key.is_empty() {
+                                job_result
+                                    .add_log(LogLevel::Warning, format!("Empty ssh credential: {}", credential_id));
+                            }
                         }
                     }
                 }
+                Ok(Some(credential))
             }
-
-            Ok(Some(credential))
-        } else {
-            Ok(None)
+            Err(_) => Ok(None),
         }
     }
 
@@ -96,12 +97,10 @@ impl Credential {
         for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
-            let credential = Credential::try_from(path).map_err(|e| e.to_string());
-            if let Err(e) = credential {
-                eprintln!("Error reading credential: {:?}", e);
-                continue;
+            match Credential::try_from(path) {
+                Ok(credential) => credentials.push(credential),
+                Err(e) => eprintln!("Error reading credential: {:?}", e),
             }
-            credentials.push(credential.unwrap());
         }
         Ok(credentials)
     }
@@ -122,22 +121,24 @@ impl Credential {
             self.save()?;
             return Ok(());
         }
-        let job_result = job_result.as_deref_mut();
-        let job_result = job_result.unwrap();
+        let job_result = job_result.as_deref_mut().unwrap();
 
         let current_type = self.get_credential_type();
         let existing_credential = Credential::get(self.id.as_str(), Some(job_result))?;
-        if let Some(existing_credential) = existing_credential {
-            let existing_type = existing_credential.get_credential_type();
-            if *existing_type != *current_type {
-                self.save()?;
-                job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
-            } else {
-                job_result.add_log(LogLevel::Info, format!("No changes in credential {:?}", self.id))
+        match existing_credential {
+            Some(existing_credential) => {
+                let existing_type = existing_credential.get_credential_type();
+                if *existing_type != *current_type {
+                    self.save()?;
+                    job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
+                } else {
+                    job_result.add_log(LogLevel::Info, format!("No changes in credential {:?}", self.id))
+                }
             }
-        } else {
-            self.save()?;
-            job_result.add_log(LogLevel::Info, format!("Created credential {:?}", self.id))
+            None => {
+                self.save()?;
+                job_result.add_log(LogLevel::Info, format!("Created credential {:?}", self.id))
+            }
         }
 
         Ok(())

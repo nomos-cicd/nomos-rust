@@ -73,14 +73,30 @@ impl ScriptExecutor for GitCloneScript {
 
         git_clone(&url, branch.as_str(), directory, credential_id.as_deref(), job_result)?;
 
-        let mut new_dir = directory.join(url.split('/').last().unwrap());
-        if new_dir.to_str().unwrap().ends_with(".git") {
-            new_dir = PathBuf::from(new_dir.to_str().unwrap().strip_suffix(".git").unwrap());
+        let mut new_dir = match url.split('/').last() {
+            Some(last_part) => directory.join(last_part),
+            None => return Err("Invalid URL format".to_string()),
+        };
+
+        if let Some(dir_str) = new_dir.to_str() {
+            if dir_str.ends_with(".git") {
+                new_dir = match dir_str.strip_suffix(".git") {
+                    Some(stripped) => PathBuf::from(stripped),
+                    None => return Err("Failed to strip .git suffix".to_string()),
+                };
+            }
+        } else {
+            return Err("Invalid directory path".to_string());
         }
+
+        let new_dir_str = match new_dir.to_str() {
+            Some(s) => s,
+            None => return Err("Invalid directory path".to_string()),
+        };
 
         parameters.insert(
             format!("steps.{}.git-clone.directory", step_name),
-            ScriptParameterType::String(new_dir.to_str().unwrap().to_string()),
+            ScriptParameterType::String(new_dir_str.to_string()),
         );
 
         Ok(())

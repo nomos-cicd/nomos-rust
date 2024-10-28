@@ -23,32 +23,33 @@ pub fn git_clone(
         }
 
         Ok(())
-    } else if credential_id.is_some() {
-        let credential = Credential::get(credential_id.unwrap(), Some(job_result))?;
-        if credential.is_none() {
-            return Err(format!("Credential not found: {}", credential_id.unwrap()));
-        }
-        let credential = credential.unwrap();
-        if let CredentialType::Ssh(ssh_credential) = credential.value {
-            job_result.add_log(LogLevel::Info, "command: chmod 400 <private_key_temp_file>".to_string());
-            job_result.add_log(LogLevel::Info, format!("command: git clone -b {} {}", branch, url));
-            if !job_result.dry_run {
-                let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
-                let tmp_path = tmp_file.path();
-                let _ = std::fs::write(tmp_path, ssh_credential.private_key);
+    } else if let Some(cred_id) = credential_id {
+        let credential = match Credential::get(cred_id, Some(job_result))? {
+            Some(cred) => cred,
+            None => return Err(format!("Credential not found: {}", cred_id)),
+        };
 
-                execute_command(&format!("chmod 400 {}", tmp_path.display()), directory, job_result)?;
+        match credential.value {
+            CredentialType::Ssh(ssh_credential) => {
+                job_result.add_log(LogLevel::Info, "command: chmod 400 <private_key_temp_file>".to_string());
+                job_result.add_log(LogLevel::Info, format!("command: git clone -b {} {}", branch, url));
+                if !job_result.dry_run {
+                    let tmp_file = NamedTempFile::new().map_err(|e| e.to_string())?;
+                    let tmp_path = tmp_file.path();
+                    std::fs::write(tmp_path, ssh_credential.private_key).map_err(|e| e.to_string())?;
 
-                let env = vec![(
-                    "GIT_SSH_COMMAND".to_string(),
-                    format!("ssh -i {} -o StrictHostKeyChecking=no", tmp_path.display()),
-                )];
-                execute_command_with_env(&format!("git clone -b {} {}", branch, url), directory, env, job_result)?;
+                    execute_command(&format!("chmod 400 {}", tmp_path.display()), directory, job_result)?;
+
+                    let env = vec![(
+                        "GIT_SSH_COMMAND".to_string(),
+                        format!("ssh -i {} -o StrictHostKeyChecking=no", tmp_path.display()),
+                    )];
+                    execute_command_with_env(&format!("git clone -b {} {}", branch, url), directory, env, job_result)?;
+                }
+
+                Ok(())
             }
-
-            Ok(())
-        } else {
-            Err("Invalid credential type".into())
+            _ => Err("Invalid credential type".into()),
         }
     } else {
         Err("Credential ID is required".into())
