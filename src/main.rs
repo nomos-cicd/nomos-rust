@@ -20,14 +20,16 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = std::env::var("NOMOS_USERNAME").map_err(|_| {
-        eprintln!("NOMOS_USERNAME environment variable is not set.");
-        std::process::exit(1);
-    });
-    let _ = std::env::var("NOMOS_PASSWORD").map_err(|_| {
-        eprintln!("NOMOS_PASSWORD environment variable is not set.");
-        std::process::exit(1);
-    });
+    if !cfg!(debug_assertions) {
+        let _ = std::env::var("NOMOS_USERNAME").map_err(|_| {
+            eprintln!("NOMOS_USERNAME environment variable is not set.");
+            std::process::exit(1);
+        });
+        let _ = std::env::var("NOMOS_PASSWORD").map_err(|_| {
+            eprintln!("NOMOS_PASSWORD environment variable is not set.");
+            std::process::exit(1);
+        });
+    }
 
     // initialize tracing
     tracing_subscriber::registry()
@@ -46,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
     // build our application with a route
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/api/credentials", routing::get(get_credentials))
         .route("/api/credentials/:id", routing::get(get_credential))
         .route("/api/credentials", routing::post(create_credential))
@@ -79,8 +81,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/job-results/:id", routing::get(template_job_result))
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
         .route("/job-results/:id/header", routing::get(template_job_result_header))
-        .route("/job-results/:id/steps", routing::get(template_job_result_steps))
-        .route_layer(login_required!(Backend, login_url = "/login"))
+        .route("/job-results/:id/steps", routing::get(template_job_result_steps));
+
+    // Only add authentication layer in release mode
+    if !cfg!(debug_assertions) {
+        app = app
+            .route_layer(login_required!(Backend, login_url = "/login"));
+    }
+
+    app = app
         .route("/login", routing::get(template_get_login))
         .route("/login", routing::post(template_post_login))
         .route("/public/api/webhook", routing::post(job_webhook_trigger))
