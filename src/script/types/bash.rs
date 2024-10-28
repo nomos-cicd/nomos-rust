@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::Path};
 
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +21,7 @@ impl ScriptExecutor for BashScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {

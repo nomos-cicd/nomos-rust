@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +25,7 @@ impl ScriptExecutor for GitCloneScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -68,13 +71,7 @@ impl ScriptExecutor for GitCloneScript {
             None => "main".to_string(),
         };
 
-        git_clone(
-            &url,
-            branch.as_str(),
-            directory,
-            credential_id.as_deref(),
-            job_result,
-        )?;
+        git_clone(&url, branch.as_str(), directory, credential_id.as_deref(), job_result)?;
 
         let mut new_dir = directory.join(url.split('/').last().unwrap());
         if new_dir.to_str().unwrap().ends_with(".git") {

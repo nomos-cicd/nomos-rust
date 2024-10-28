@@ -35,7 +35,7 @@ pub struct JobFormQuery {
 
 pub async fn template_jobs() -> Response {
     let jobs = job::Job::get_all();
-    if let Err(_) = jobs {
+    if jobs.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let jobs = jobs.unwrap();
@@ -57,7 +57,7 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
     } else {
         Ok(None)
     };
-    if let Err(_) = job {
+    if job.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let job = job.unwrap();
@@ -69,7 +69,7 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
 
     if let Some(from_script_id) = &params.from_script_id {
         let script = Script::get(from_script_id.as_str());
-        if let Err(_) = script {
+        if script.is_err() {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
         let script = script.unwrap();
@@ -80,7 +80,7 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
 
     if let Some(from_job_id) = &params.from_job_id {
         let job = job::Job::get(from_job_id.as_str());
-        if let Err(_) = job {
+        if job.is_err() {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
         let job = job.unwrap();

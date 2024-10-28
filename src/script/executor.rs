@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::Path};
 
 use crate::{job::JobResult, log::LogLevel};
 
@@ -8,7 +8,7 @@ pub trait ScriptExecutor {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String>;
@@ -18,7 +18,7 @@ impl ScriptExecutor for RunningScriptStep {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -34,7 +34,7 @@ impl ScriptExecutor for ScriptType {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {

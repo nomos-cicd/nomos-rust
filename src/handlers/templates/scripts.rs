@@ -23,7 +23,7 @@ pub struct ScriptTemplate<'a> {
 
 pub async fn template_scripts() -> Response {
     let scripts = Script::get_all();
-    if let Err(_) = scripts {
+    if scripts.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let scripts = scripts.unwrap();
@@ -48,7 +48,7 @@ pub async fn template_script(id: Option<Path<String>>, title: &str) -> Response 
     } else {
         Ok(None)
     };
-    if let Err(_) = script {
+    if script.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let script = script.unwrap();

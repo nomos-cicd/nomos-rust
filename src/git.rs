@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use tempfile::NamedTempFile;
 
@@ -12,18 +12,14 @@ use crate::{
 pub fn git_clone(
     url: &str,
     branch: &str,
-    directory: &PathBuf,
+    directory: &Path,
     credential_id: Option<&str>,
     job_result: &mut JobResult,
 ) -> Result<(), String> {
     if cfg!(target_os = "windows") {
         if !job_result.dry_run {
             // Workaround for local
-            execute_command(
-                &format!("git clone -b {} {}", branch, url),
-                directory,
-                job_result,
-            )?;
+            execute_command(&format!("git clone -b {} {}", branch, url), directory, job_result)?;
         }
 
         Ok(())
@@ -41,22 +37,13 @@ pub fn git_clone(
                 let tmp_path = tmp_file.path();
                 let _ = std::fs::write(tmp_path, ssh_credential.private_key);
 
-                execute_command(
-                    &format!("chmod 400 {}", tmp_path.display()),
-                    directory,
-                    job_result,
-                )?;
+                execute_command(&format!("chmod 400 {}", tmp_path.display()), directory, job_result)?;
 
                 let env = vec![(
                     "GIT_SSH_COMMAND".to_string(),
                     format!("ssh -i {} -o StrictHostKeyChecking=no", tmp_path.display()),
                 )];
-                execute_command_with_env(
-                    &format!("git clone -b {} {}", branch, url),
-                    directory,
-                    env,
-                    job_result,
-                )?;
+                execute_command_with_env(&format!("git clone -b {} {}", branch, url), directory, env, job_result)?;
             }
 
             Ok(())

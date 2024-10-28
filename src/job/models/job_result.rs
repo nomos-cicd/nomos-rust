@@ -10,7 +10,7 @@ use std::{
 use crate::{
     job::{models::Job, utils::default_job_results_location},
     log::{JobLogger, LogLevel},
-    script::models::{Script, RunningScriptStep},
+    script::models::{RunningScriptStep, Script},
 };
 
 #[derive(Debug, Serialize, Deserialize)]

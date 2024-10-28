@@ -55,6 +55,7 @@ static JOB_RESULTS: Lazy<Arc<Mutex<File>>> = Lazy::new(|| {
         .read(true)
         .write(true)
         .create(true)
+        .truncate(true)
         .open(&path)
         .expect("Failed to open or create file");
 

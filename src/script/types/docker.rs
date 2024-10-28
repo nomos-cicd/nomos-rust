@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +25,7 @@ impl ScriptExecutor for DockerBuildScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -86,7 +89,7 @@ impl ScriptExecutor for DockerStopScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {
@@ -125,7 +128,7 @@ impl ScriptExecutor for DockerRunScript {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        directory: &PathBuf,
+        directory: &Path,
         _step_name: &str,
         job_result: &mut JobResult,
     ) -> Result<(), String> {

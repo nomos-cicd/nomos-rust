@@ -63,7 +63,7 @@ pub struct JobResultStepsTemplate<'a> {
 
 pub async fn template_job_results(query: Query<JobResultsQuery>) -> Response {
     let results = JobResult::get_all(query.job_id.clone());
-    if let Err(_) = results {
+    if results.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let results = results.unwrap();
@@ -79,7 +79,7 @@ pub async fn template_job_results(query: Query<JobResultsQuery>) -> Response {
 
 pub async fn template_job_results_table(query: Query<JobResultsQuery>) -> Response {
     let results = JobResult::get_all(query.job_id.clone());
-    if let Err(_) = results {
+    if results.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let results = results.unwrap();
@@ -89,7 +89,7 @@ pub async fn template_job_results_table(query: Query<JobResultsQuery>) -> Respon
 
 pub async fn template_job_result(Path(id): Path<String>) -> Response {
     let result = JobResult::get(&id);
-    if let Err(_) = result {
+    if result.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();
@@ -106,7 +106,7 @@ pub async fn template_job_result(Path(id): Path<String>) -> Response {
 
 pub async fn template_job_result_logs(Path(result_id): Path<String>) -> Response {
     let result = JobResult::get(&result_id);
-    if let Err(_) = result {
+    if result.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();
@@ -135,7 +135,7 @@ pub async fn template_job_result_logs(Path(result_id): Path<String>) -> Response
 
 pub async fn template_job_result_header(Path(id): Path<String>) -> Response {
     let result = JobResult::get(&id);
-    if let Err(_) = result {
+    if result.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();
@@ -152,7 +152,7 @@ pub async fn template_job_result_header(Path(id): Path<String>) -> Response {
 
 pub async fn template_job_result_steps(Path(id): Path<String>) -> Response {
     let result = JobResult::get(&id);
-    if let Err(_) = result {
+    if result.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let result = result.unwrap();

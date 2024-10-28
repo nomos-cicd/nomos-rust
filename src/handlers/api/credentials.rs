@@ -29,16 +29,10 @@ pub async fn get_credential(Path(id): Path<String>) -> Response {
 }
 
 pub async fn create_credential(Json(credential): Json<Credential>) -> Response {
-    match Credential::try_from(credential) {
-        Ok(credential) => match credential.sync(&mut None) {
-            Ok(_) => Json(credential).into_response(),
-            Err(e) => {
-                eprintln!("Failed to sync credential: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR.into_response()
-            }
-        },
+    match credential.sync(&mut None) {
+        Ok(_) => Json(credential).into_response(),
         Err(e) => {
-            eprintln!("Failed to create credential: {}", e);
+            eprintln!("Failed to sync credential: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }

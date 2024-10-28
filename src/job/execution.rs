@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     job::models::{Job, JobResult},
@@ -35,7 +39,7 @@ impl JobExecutor {
 
     pub fn execute_job_result(
         job_result: &mut JobResult,
-        directory: &PathBuf,
+        directory: &Path,
         parameters: &mut HashMap<String, ScriptParameterType>,
     ) -> Result<(), String> {
         let mut is_success = true;

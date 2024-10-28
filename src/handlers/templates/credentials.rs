@@ -19,7 +19,7 @@ pub struct CredentialsTemplate<'a> {
 
 pub async fn template_credentials() -> Response {
     let credentials = Credential::get_all();
-    if let Err(_) = credentials {
+    if credentials.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let credentials = credentials.unwrap();
@@ -52,7 +52,7 @@ pub async fn template_credential(id: Option<Path<String>>, title: &str) -> Respo
     } else {
         Ok(None)
     };
-    if let Err(_) = credential {
+    if credential.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let credential = credential.unwrap();
@@ -88,7 +88,7 @@ pub struct CredentialValueQuery {
 pub async fn template_credential_value(params: Query<CredentialValueQuery>) -> Response {
     if let Some(id) = &params.id {
         let credential = Credential::get(id.as_str(), None);
-        if let Err(_) = credential {
+        if credential.is_err() {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
         let credential = credential.unwrap();
