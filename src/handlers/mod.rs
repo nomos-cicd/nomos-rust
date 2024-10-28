@@ -1,6 +1,6 @@
-mod api;
+pub mod api;
 mod auth;
-mod templates;
+pub mod templates;
 
 pub use api::*;
 pub use auth::*;

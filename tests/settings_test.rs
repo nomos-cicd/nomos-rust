@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use chrono::Utc;
 use nomos_rust::{
     job::{Job, JobResult},
     script::models::Script,
@@ -24,6 +25,11 @@ fn sync() {
         steps: vec![],
     };
     let mut job_result = JobResult::try_from((&job, &script, false)).unwrap();
+    job_result.save().unwrap(); // Workaround for creating yml file.
     let res = settings::sync(path, &mut job_result);
+    job_result.save().unwrap(); // Workaround for creating yml file.
     assert!(res.is_ok());
+    job_result.finished_at = Some(Utc::now());
+    job_result.is_success = res.is_ok();
+    job_result.save().unwrap(); // Workaround for creating yml file.
 }
