@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 
-use crate::script::{models::Script, ScriptParameterType};
+use crate::script::models::Script;
 
 pub async fn get_scripts() -> Response {
     match Script::get_all() {
@@ -65,16 +65,6 @@ pub async fn delete_script(Path(id): Path<String>) -> Response {
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
             eprintln!("Failed to get script for deletion {}: {}", id, e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
-}
-
-pub async fn get_script_parameter_types() -> Response {
-    match ScriptParameterType::get_json_schema() {
-        Ok(types) => Json(types).into_response(),
-        Err(e) => {
-            eprintln!("Failed to get script parameter types: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }

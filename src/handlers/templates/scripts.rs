@@ -19,7 +19,6 @@ pub struct ScriptsTemplate<'a> {
 pub struct ScriptTemplate<'a> {
     title: &'a str,
     script: Option<&'a str>,
-    // json_schema: &'a str,
 }
 
 pub async fn template_scripts() -> Response {
@@ -59,13 +58,9 @@ pub async fn template_script(id: Option<Path<String>>, title: &str) -> Response 
         script_yaml = Some(serde_yaml::to_string(script).unwrap());
     }
 
-    // let json_schema = Script::get_json_schema();
-    // let json_schema_str = serde_json::to_string(&json_schema).unwrap();
-
     let template = ScriptTemplate {
         title,
         script: script_yaml.as_deref(),
-        // json_schema: &json_schema_str,
     };
     Html(template.render().unwrap()).into_response()
 }

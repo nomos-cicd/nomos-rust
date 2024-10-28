@@ -1,7 +1,6 @@
-use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "type", content = "value")]
 pub enum ScriptParameterType {
     #[serde(rename = "string")]
@@ -18,17 +17,10 @@ pub enum ScriptParameterType {
     StringArray(Vec<String>),
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Default, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub struct ScriptParameter {
     pub name: String,
     pub description: String,
     pub required: bool,
     pub default: Option<ScriptParameterType>,
-}
-
-impl ScriptParameterType {
-    pub fn get_json_schema() -> Result<serde_json::Value, String> {
-        let schema = schema_for!(ScriptParameterType);
-        serde_json::to_value(schema).map_err(|e| e.to_string())
-    }
 }

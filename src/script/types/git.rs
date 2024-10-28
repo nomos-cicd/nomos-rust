@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct GitCloneScript {
     pub url: String,
     pub credential_id: Option<String>,

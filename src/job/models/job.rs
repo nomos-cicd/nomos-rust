@@ -1,4 +1,3 @@
-use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -16,9 +15,9 @@ use crate::{
     script::{models::Script, ScriptParameter, ScriptParameterType},
 };
 
-use super::trigger::TriggerType;
+use super::{trigger::TriggerType, TriggerPlaceHolder};
 
-#[derive(Deserialize, Serialize, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Job {
     pub id: String,
     pub name: String,
@@ -176,11 +175,6 @@ impl Job {
             None => script_parameter.default.clone(),
         })
     }
-
-    #[allow(dead_code)]
-    pub fn get_json_schema() -> Result<serde_json::Value, String> {
-        serde_json::to_value(schema_for!(Job)).map_err(|e| format!("Failed to generate JSON schema: {}", e))
-    }
 }
 
 impl TryFrom<PathBuf> for Job {
@@ -210,8 +204,8 @@ impl From<&Script> for Job {
             name: script.name.clone(),
             parameters,
             triggers: vec![
-                TriggerType::Manual(Default::default()),
-                TriggerType::Github(Default::default()),
+                TriggerType::Manual(TriggerPlaceHolder::get_place_holder()),
+                TriggerType::Github(TriggerPlaceHolder::get_place_holder()),
             ],
             script_id: script.id.clone(),
             read_only: false,
@@ -222,19 +216,17 @@ impl From<&Script> for Job {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::script::models::YamlScriptStep;
+    use crate::script::models::ScriptStep;
 
     #[test]
     fn test_validate_parameters() {
         let job = Job {
             id: "test_job".to_string(),
             name: "Test Job".to_string(),
-            parameters: vec![
-                JobParameterDefinition {
-                    name: "param1".to_string(),
-                    default: None,
-                },
-            ],
+            parameters: vec![JobParameterDefinition {
+                name: "param1".to_string(),
+                default: None,
+            }],
             triggers: vec![],
             script_id: "test_script".to_string(),
             read_only: false,
@@ -257,7 +249,10 @@ mod tests {
                     required: true,
                 },
             ],
-            steps: vec![YamlScriptStep::default()],
+            steps: vec![ScriptStep {
+                name: "step1".to_string(),
+                values: vec![],
+            }],
         };
 
         let result = job.validate_parameters(Some(&script));
@@ -270,12 +265,10 @@ mod tests {
         let job = Job {
             id: "test_job".to_string(),
             name: "Test Job".to_string(),
-            parameters: vec![
-                JobParameterDefinition {
-                    name: "param1".to_string(),
-                    default: Some(ScriptParameterType::String("default1".to_string())),
-                },
-            ],
+            parameters: vec![JobParameterDefinition {
+                name: "param1".to_string(),
+                default: Some(ScriptParameterType::String("default1".to_string())),
+            }],
             triggers: vec![],
             script_id: "test_script".to_string(),
             read_only: false,
@@ -298,18 +291,26 @@ mod tests {
                     required: false,
                 },
             ],
-            steps: vec![YamlScriptStep::default()],
+            steps: vec![ScriptStep {
+                name: "step1".to_string(),
+                values: vec![],
+            }],
         };
 
-        let provided_params = HashMap::from([
-            ("param1".to_string(), ScriptParameterType::String("value1".to_string())),
-        ]);
+        let provided_params =
+            HashMap::from([("param1".to_string(), ScriptParameterType::String("value1".to_string()))]);
 
         let result = job.merged_parameters(Some(&script), provided_params);
         assert!(result.is_ok());
         let merged = result.unwrap();
-        assert_eq!(merged.get("parameters.param1"), Some(&ScriptParameterType::String("value1".to_string())));
-        assert_eq!(merged.get("parameters.param2"), Some(&ScriptParameterType::String("default2".to_string())));
+        assert_eq!(
+            merged.get("parameters.param1"),
+            Some(&ScriptParameterType::String("value1".to_string()))
+        );
+        assert_eq!(
+            merged.get("parameters.param2"),
+            Some(&ScriptParameterType::String("default2".to_string()))
+        );
     }
 
     #[test]
@@ -317,12 +318,10 @@ mod tests {
         let job = Job {
             id: "test_job".to_string(),
             name: "Test Job".to_string(),
-            parameters: vec![
-                JobParameterDefinition {
-                    name: "param1".to_string(),
-                    default: Some(ScriptParameterType::String("default1".to_string())),
-                },
-            ],
+            parameters: vec![JobParameterDefinition {
+                name: "param1".to_string(),
+                default: Some(ScriptParameterType::String("default1".to_string())),
+            }],
             triggers: vec![],
             script_id: "test_script".to_string(),
             read_only: false,
@@ -335,9 +334,8 @@ mod tests {
             required: true,
         };
 
-        let provided_params = HashMap::from([
-            ("param1".to_string(), ScriptParameterType::String("value1".to_string())),
-        ]);
+        let provided_params =
+            HashMap::from([("param1".to_string(), ScriptParameterType::String("value1".to_string()))]);
 
         let result = job.resolve_parameter_value(&script_param, &provided_params);
         assert!(result.is_ok());
@@ -346,6 +344,9 @@ mod tests {
         let empty_params = HashMap::new();
         let result = job.resolve_parameter_value(&script_param, &empty_params);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some(ScriptParameterType::String("default1".to_string())));
+        assert_eq!(
+            result.unwrap(),
+            Some(ScriptParameterType::String("default1".to_string()))
+        );
     }
 }

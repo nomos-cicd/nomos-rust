@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use nomos_rust::job::{Job, JobExecutor, JobResult};
-use nomos_rust::script::models::{Script, YamlScriptStep};
+use nomos_rust::script::models::{Script, ScriptStep};
 use nomos_rust::script::types::{BashScript, ScriptType};
 use nomos_rust::script::ScriptParameterType;
 
@@ -100,7 +100,7 @@ async fn docker_job() {
 fn validation() {
     // Missing git step
     let script = Script {
-        steps: vec![YamlScriptStep {
+        steps: vec![ScriptStep {
             name: "Test Step".to_string(),
             values: vec![ScriptType::Bash(BashScript {
                 code: "echo $(missing.param)".to_string(),

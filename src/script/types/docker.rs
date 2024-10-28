@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct DockerBuildScript {
     pub image: String,
     pub dockerfile: Option<String>,
@@ -78,7 +77,7 @@ impl ScriptExecutor for DockerBuildScript {
 }
 
 /// Stops and removes a docker container. Ignoring errors.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct DockerStopScript {
     pub container: String,
 }
@@ -108,14 +107,14 @@ impl ScriptExecutor for DockerStopScript {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum DockerRunArg {
     Direct(String),
     EnvFromCredential { credential_id: String },
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct DockerRunScript {
     pub image: String,
     pub container: Option<String>,

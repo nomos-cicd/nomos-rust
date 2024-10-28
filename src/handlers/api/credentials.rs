@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 
-use crate::credential::{Credential, CredentialType};
+use crate::credential::Credential;
 
 pub async fn get_credentials() -> Response {
     match Credential::get_all() {
@@ -59,8 +59,4 @@ pub async fn delete_credential(Path(id): Path<String>) -> Response {
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
-}
-
-pub async fn get_credential_types() -> Response {
-    Json(CredentialType::get_json_schema()).into_response()
 }

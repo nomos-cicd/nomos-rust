@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crate::{job::JobResult, log::LogLevel};
 
-use super::{models::ScriptStep, types::ScriptType, ScriptParameterType};
+use super::{models::RunningScriptStep, types::ScriptType, ScriptParameterType};
 
 pub trait ScriptExecutor {
     fn execute(
@@ -14,7 +14,7 @@ pub trait ScriptExecutor {
     ) -> Result<(), String>;
 }
 
-impl ScriptExecutor for ScriptStep {
+impl ScriptExecutor for RunningScriptStep {
     fn execute(
         &self,
         parameters: &mut HashMap<String, ScriptParameterType>,

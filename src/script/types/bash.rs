@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
     utils::execute_command,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BashScript {
     pub code: String,
 }

@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
 };
 
 /// Scans directory for credential, script and job files and syncs them with the database.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SyncScript {
     pub directory: String,
 }

@@ -206,13 +206,3 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
         }
     }
 }
-
-pub async fn get_job_trigger_types() -> Response {
-    match TriggerType::get_json_schema() {
-        Ok(types) => Json(types).into_response(),
-        Err(e) => {
-            eprintln!("Failed to get job trigger types: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
-}

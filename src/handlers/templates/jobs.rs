@@ -6,7 +6,10 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::{job::{self, Job}, script::models::Script};
+use crate::{
+    job::{self, Job},
+    script::models::Script,
+};
 
 #[derive(Template)]
 #[template(path = "jobs.html")]
@@ -20,7 +23,6 @@ pub struct JobsTemplate<'a> {
 pub struct JobTemplate<'a> {
     title: &'a str,
     job: Option<&'a str>,
-    // json_schema: &'a str,
 }
 
 #[derive(Deserialize, Default)]
@@ -87,13 +89,9 @@ pub async fn template_job(id: Option<Path<String>>, title: &str, params: Query<J
         }
     }
 
-    // let json_schema = job::Job::get_json_schema();
-    // let json_schema_str = serde_json::to_string(&json_schema).unwrap();
-
     let template = JobTemplate {
         title,
         job: job_yaml.as_deref(),
-        // json_schema: &json_schema_str,
     };
     Html(template.render().unwrap()).into_response()
 }

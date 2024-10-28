@@ -10,7 +10,7 @@ use std::{
 use crate::{
     job::{models::Job, utils::default_job_results_location},
     log::{JobLogger, LogLevel},
-    script::models::{Script, ScriptStep},
+    script::models::{Script, RunningScriptStep},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,7 +18,7 @@ pub struct JobResult {
     pub id: String,
     pub job_id: String,
     pub is_success: bool,
-    pub steps: Vec<ScriptStep>,
+    pub steps: Vec<RunningScriptStep>,
     pub current_step_name: Option<String>,
     pub started_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -32,7 +32,7 @@ impl JobResult {
     pub fn new(
         id: String,
         job_id: String,
-        steps: Vec<ScriptStep>,
+        steps: Vec<RunningScriptStep>,
         logger: Arc<Mutex<JobLogger>>,
         dry_run: bool,
     ) -> Self {
@@ -51,7 +51,7 @@ impl JobResult {
         }
     }
 
-    pub fn get_current_step_mut(&mut self) -> Option<&mut ScriptStep> {
+    pub fn get_current_step_mut(&mut self) -> Option<&mut RunningScriptStep> {
         self.current_step_name
             .as_ref()
             .and_then(|name| self.steps.iter_mut().find(|step| step.name == *name))
@@ -205,7 +205,7 @@ impl TryFrom<&Job> for JobResult {
         let script =
             Script::get(&job.script_id)?.ok_or_else(|| format!("Script with id '{}' not found", job.script_id))?;
 
-        let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
+        let steps: Vec<RunningScriptStep> = script.steps.iter().map(RunningScriptStep::from).collect();
         let logger = Arc::new(Mutex::new(JobLogger::new(job.id.clone(), id.clone(), false)?));
 
         Ok(Self::new(id, job.id.clone(), steps, logger, false))
@@ -222,7 +222,7 @@ impl TryFrom<(&Job, &Script, bool)> for JobResult {
             "dry_run".to_string()
         };
 
-        let steps: Vec<ScriptStep> = script.steps.iter().map(ScriptStep::from).collect();
+        let steps: Vec<RunningScriptStep> = script.steps.iter().map(RunningScriptStep::from).collect();
         let logger = Arc::new(Mutex::new(JobLogger::new(job.id.clone(), id.clone(), dry_mode)?));
 
         Ok(Self::new(id, job.id.clone(), steps, logger, dry_mode))

@@ -1,28 +1,27 @@
 use std::{path::PathBuf, str::FromStr};
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{job::JobResult, log::LogLevel};
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Default, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct TextCredentialParameter {
     pub value: String,
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Default, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct SshCredentialParameter {
     pub username: String,
     pub private_key: String,
 }
 
 /// Similar to node.js's `.env` file.
-#[derive(Deserialize, Serialize, Clone, PartialEq, JsonSchema, Default, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct EnvCredentialParameter {
     pub value: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum CredentialType {
     #[serde(rename = "text")]
@@ -31,13 +30,6 @@ pub enum CredentialType {
     Ssh(SshCredentialParameter),
     #[serde(rename = "env")]
     Env(EnvCredentialParameter),
-}
-
-impl CredentialType {
-    pub fn get_json_schema() -> Result<serde_json::Value, String> {
-        let schema = schemars::schema_for!(CredentialType);
-        serde_json::to_value(schema).map_err(|e| e.to_string())
-    }
 }
 
 impl FromStr for CredentialType {

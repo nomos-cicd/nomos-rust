@@ -1,23 +1,22 @@
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use chrono::{DateTime, Utc};
-use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 
 use crate::{job::JobResult, log::LogLevel};
 
 use super::{default_scripts_location, types::ScriptType, ScriptParameter};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Script {
     pub id: String,
     pub name: String,
     pub parameters: Vec<ScriptParameter>,
-    pub steps: Vec<YamlScriptStep>,
+    pub steps: Vec<ScriptStep>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
-pub struct ScriptStep {
+pub struct RunningScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
     pub is_started: bool,
@@ -27,8 +26,8 @@ pub struct ScriptStep {
     pub finished_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, Deserialize, Default, PartialEq, JsonSchema, Clone, Debug)]
-pub struct YamlScriptStep {
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+pub struct ScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
 }
@@ -94,12 +93,6 @@ impl Script {
         let path = default_scripts_location()?.join(format!("{}.yml", self.id));
         std::fs::remove_file(path).map_err(|e| e.to_string())
     }
-
-    #[allow(dead_code)]
-    pub fn get_json_schema() -> Result<serde_json::Value, String> {
-        let schema = schema_for!(Script);
-        serde_json::to_value(schema).map_err(|e| e.to_string())
-    }
 }
 
 impl TryFrom<PathBuf> for Script {
@@ -116,7 +109,7 @@ impl TryFrom<PathBuf> for Script {
     }
 }
 
-impl ScriptStep {
+impl RunningScriptStep {
     pub fn start(&mut self) {
         self.is_started = true;
         self.started_at = Utc::now();
@@ -129,9 +122,9 @@ impl ScriptStep {
     }
 }
 
-impl Default for ScriptStep {
+impl Default for RunningScriptStep {
     fn default() -> Self {
-        ScriptStep {
+        RunningScriptStep {
             name: String::new(),
             values: vec![],
             is_started: false,
@@ -143,9 +136,9 @@ impl Default for ScriptStep {
     }
 }
 
-impl From<&YamlScriptStep> for ScriptStep {
-    fn from(step: &YamlScriptStep) -> Self {
-        ScriptStep {
+impl From<&ScriptStep> for RunningScriptStep {
+    fn from(step: &ScriptStep) -> Self {
+        RunningScriptStep {
             name: step.name.clone(),
             values: step.values.clone(),
             ..Default::default()

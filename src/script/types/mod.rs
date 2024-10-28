@@ -3,15 +3,12 @@ pub mod docker;
 pub mod git;
 pub mod sync;
 
-use std::str::FromStr;
-
 pub use bash::BashScript;
 pub use git::GitCloneScript;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 pub use sync::SyncScript;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum ScriptType {
     #[serde(rename = "bash")]
@@ -26,20 +23,4 @@ pub enum ScriptType {
     DockerStop(docker::DockerStopScript),
     #[serde(rename = "docker-run")]
     DockerRun(docker::DockerRunScript),
-}
-
-impl FromStr for ScriptType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "bash" => Ok(ScriptType::Bash(BashScript::default())),
-            "git-clone" => Ok(ScriptType::GitClone(GitCloneScript::default())),
-            "sync" => Ok(ScriptType::Sync(SyncScript::default())),
-            "docker-build" => Ok(ScriptType::DockerBuild(docker::DockerBuildScript::default())),
-            "docker-stop" => Ok(ScriptType::DockerStop(docker::DockerStopScript::default())),
-            "docker-run" => Ok(ScriptType::DockerRun(docker::DockerRunScript::default())),
-            _ => Err(format!("Unknown script type: {}", s)),
-        }
-    }
 }

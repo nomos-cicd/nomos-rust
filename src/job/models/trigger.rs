@@ -1,7 +1,10 @@
-use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, JsonSchema, Default)]
+pub trait TriggerPlaceHolder {
+    fn get_place_holder() -> Self;
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct ManualTriggerParameter {}
 
 #[derive(Debug, Deserialize, Clone)]
@@ -14,7 +17,7 @@ pub struct GithubPayload {
     pub repository: GithubRepository,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct GithubTriggerParameter {
     pub branch: String,
     pub events: Vec<String>,
@@ -22,7 +25,7 @@ pub struct GithubTriggerParameter {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum TriggerType {
     #[serde(rename = "manual")]
@@ -31,15 +34,14 @@ pub enum TriggerType {
     Github(GithubTriggerParameter),
 }
 
-impl TriggerType {
-    pub fn get_json_schema() -> Result<serde_json::Value, String> {
-        let schema = schema_for!(TriggerType);
-        serde_json::to_value(schema).map_err(|e| e.to_string())
+impl TriggerPlaceHolder for ManualTriggerParameter {
+    fn get_place_holder() -> Self {
+        ManualTriggerParameter {}
     }
 }
 
-impl Default for GithubTriggerParameter {
-    fn default() -> Self {
+impl TriggerPlaceHolder for GithubTriggerParameter {
+    fn get_place_holder() -> Self {
         GithubTriggerParameter {
             branch: "main".to_string(),
             events: vec!["push".to_string()],
