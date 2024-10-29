@@ -1,31 +1,38 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use axum::{
-    extract::Path,
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
+use serde::Deserialize;
 
 use crate::{
     credential::{Credential, CredentialType},
-    job::{GithubPayload, Job, TriggerType},
-    script::ScriptParameterType,
+    job::{GithubPayload, Job, JobExecutor, TriggerType},
+    script::{models::Script, ScriptParameterType},
     utils::is_signature_valid,
 };
 
-pub async fn get_jobs() -> Response {
-    match Job::get_all() {
-        Ok(jobs) => Json(jobs).into_response(),
-        Err(e) => {
-            eprintln!("Failed to get jobs: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
+#[derive(Deserialize)]
+pub struct JobsQuery {
+    #[serde(rename = "script-id")]
+    script_id: Option<String>,
+}
+
+pub async fn get_jobs(Query(query): Query<JobsQuery>) -> Response {
+    let jobs = Job::get_all().unwrap_or_default();
+    let filtered_jobs: Vec<Job> = jobs
+        .into_iter()
+        .filter(|job| query.script_id.as_ref().map_or(true, |id| job.script_id == *id))
+        .collect();
+
+    Json(filtered_jobs).into_response()
 }
 
 pub async fn get_job(Path(id): Path<String>) -> Response {
-    match Job::get(id.as_str()) {
+    match Job::get(&id) {
         Ok(Some(job)) => Json(job).into_response(),
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
@@ -35,33 +42,39 @@ pub async fn get_job(Path(id): Path<String>) -> Response {
     }
 }
 
-pub async fn create_job(headers: HeaderMap, body: String) -> Response {
-    let content_type = match headers.get("content-type") {
-        Some(ct) => ct.to_str().unwrap_or(""),
-        None => return (StatusCode::BAD_REQUEST, "Empty content-type").into_response(),
-    };
-
-    if content_type != "application/yaml" {
-        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
+pub async fn create_job(Json(job): Json<Job>) -> Response {
+    match job.sync(None).await {
+        Ok(_) => (StatusCode::CREATED, Json(job)).into_response(),
+        Err(e) => {
+            eprintln!("Failed to create job: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
+}
 
-    match serde_yaml::from_str::<Job>(&body) {
-        Ok(job) => match job.sync(None) {
-            Ok(_) => (StatusCode::CREATED, job.id).into_response(),
+pub async fn execute_job(
+    State(executor): State<Arc<JobExecutor>>,
+    Path(id): Path<String>,
+    Json(parameters): Json<HashMap<String, ScriptParameterType>>,
+) -> Response {
+    match Job::get(&id) {
+        Ok(Some(job)) => match job.execute(&executor, parameters).await {
+            Ok(job_result_id) => Json(job_result_id).into_response(),
             Err(e) => {
-                eprintln!("Failed to sync job: {}", e);
-                (StatusCode::BAD_REQUEST, e).into_response()
+                eprintln!("Failed to execute job {}: {}", id, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
             }
         },
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
-            eprintln!("Failed to parse job YAML: {}", e);
-            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
+            eprintln!("Failed to get job {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
 }
 
 pub async fn delete_job(Path(id): Path<String>) -> Response {
-    match Job::get(id.as_str()) {
+    match Job::get(&id) {
         Ok(Some(job)) => match job.delete() {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => {
@@ -71,52 +84,36 @@ pub async fn delete_job(Path(id): Path<String>) -> Response {
         },
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
-            eprintln!("Failed to get job for deletion {}: {}", id, e);
+            eprintln!("Failed to get job {}: {}", id, e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
 }
 
-pub async fn execute_job(Path(id): Path<String>) -> Response {
-    match Job::get(id.as_str()) {
-        Ok(Some(job)) => match job.execute(Default::default()) {
-            Ok(result) => (StatusCode::OK, result).into_response(),
-            Err(e) => {
-                eprintln!("Failed to execute job {}: {}", id, e);
-                StatusCode::INTERNAL_SERVER_ERROR.into_response()
-            }
-        },
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+#[derive(Deserialize)]
+pub struct DryRunJobPayload {
+    script: Script,
+    #[serde(default)]
+    parameters: HashMap<String, ScriptParameterType>,
+}
+
+pub async fn dry_run_job(Json(payload): Json<DryRunJobPayload>) -> Response {
+    let job = Job::from(&payload.script);
+
+    match job.validate(Some(&payload.script), payload.parameters).await {
+        Ok(_) => StatusCode::OK.into_response(),
         Err(e) => {
-            eprintln!("Failed to get job for execution {}: {}", id, e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            eprintln!("Dry run failed: {}", e);
+            (StatusCode::BAD_REQUEST, e).into_response()
         }
     }
 }
 
-pub async fn dry_run_job(headers: HeaderMap, body: String) -> Response {
-    let content_type = match headers.get("content-type") {
-        Some(ct) => ct.to_str().unwrap_or(""),
-        None => return (StatusCode::BAD_REQUEST, "Empty content-type").into_response(),
-    };
-
-    if content_type != "application/yaml" {
-        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
-    }
-
-    match serde_yaml::from_str::<Job>(&body) {
-        Ok(job) => match job.validate(None, Default::default()) {
-            Ok(_) => StatusCode::OK.into_response(),
-            Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
-        },
-        Err(e) => {
-            eprintln!("Failed to parse job YAML: {}", e);
-            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
-        }
-    }
-}
-
-pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
+pub async fn job_webhook_trigger(
+    State(executor): State<Arc<JobExecutor>>,
+    headers: HeaderMap,
+    body: String,
+) -> Response {
     match Job::get_all() {
         Ok(jobs) => {
             for job in jobs {
@@ -181,7 +178,7 @@ pub async fn job_webhook_trigger(headers: HeaderMap, body: String) -> Response {
                                                     ScriptParameterType::String(body.clone()),
                                                 );
 
-                                                match job.execute(params) {
+                                                match job.execute(&executor, params).await {
                                                     Ok(result) => eprintln!("Job started: {}", result),
                                                     Err(e) => eprintln!("Failed to execute job: {}", e),
                                                 }

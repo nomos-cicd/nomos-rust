@@ -8,18 +8,17 @@ mod script;
 mod settings;
 mod utils;
 
-use axum::{routing, Router, Extension};
+use axum::{routing, Router};
 use axum_login::{
     login_required,
     tower_sessions::{MemoryStore, SessionManagerLayer},
     AuthManagerLayerBuilder,
 };
 use handlers::*;
+use job::JobExecutor;
+use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-use std::sync::Arc;
-use tokio::sync::{Mutex, oneshot};
-use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -50,8 +49,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = Backend::default();
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
-    // Shared state for abort senders
-    let abort_senders = Arc::new(Mutex::new(HashMap::<String, oneshot::Sender<()>>::new()));
+    // Create JobExecutor
+    let job_executor = Arc::new(JobExecutor::new());
 
     // build our application with a route
     let mut app = Router::new()
@@ -89,12 +88,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
         .route("/job-results/:id/header", routing::get(template_job_result_header))
         .route("/job-results/:id/steps", routing::get(template_job_result_steps))
-        .layer(Extension(abort_senders));
+        .with_state(job_executor.clone());
 
     // Only add authentication layer in release mode
     if !cfg!(debug_assertions) {
-        app = app
-            .route_layer(login_required!(Backend, login_url = "/login"));
+        app = app.route_layer(login_required!(Backend, login_url = "/login"));
     }
 
     app = app
@@ -108,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
         .map_err(|e| e.to_string())?;
-    axum::serve(listener, app.into_make_service()).await?;
+    axum::serve(listener, app)?;
 
     Ok(())
 }

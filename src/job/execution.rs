@@ -2,19 +2,31 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tokio::select;
 use tokio_util::sync::CancellationToken;
+use tokio::sync::Mutex;
 
 use crate::{
     job::models::{Job, JobResult},
     script::{models::Script, ScriptExecutionContext, ScriptExecutor, ScriptParameterType},
 };
 
-pub struct JobExecutor;
+#[derive(Debug, Clone)]
+pub struct JobExecutor {
+    cancellation_tokens: Arc<Mutex<HashMap<String, CancellationToken>>>,
+}
 
 impl JobExecutor {
-    pub fn execute_with_script(
+    pub fn new() -> Self {
+        JobExecutor {
+            cancellation_tokens: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub async fn execute_with_script(
+        &self,
         job: &Job,
         parameters: HashMap<String, ScriptParameterType>,
         script: &Script,
@@ -24,6 +36,7 @@ impl JobExecutor {
         let mut merged_parameters = job.merged_parameters(Some(script), parameters.clone())?;
         let mut job_result = JobResult::try_from((job, script, false))?;
         let id = job_result.id.clone();
+        let cloned_id = id.clone();
 
         let directory = crate::job::utils::default_job_results_location()?.join(&job_result.id);
         fs::create_dir_all(&directory).map_err(|e| format!("Failed to create job result directory: {}", e))?;
@@ -31,7 +44,11 @@ impl JobExecutor {
         job_result.save()?;
         let cancellation_token = CancellationToken::new();
 
+        // Store the cancellation token
+        self.cancellation_tokens.lock().await.insert(id.clone(), cancellation_token.clone());
+
         let cloned_cancellation_token = cancellation_token.clone();
+        let cloned_self = self.clone();
         tokio::spawn(async move {
             select! {
                 _ = cloned_cancellation_token.cancelled() => {
@@ -41,18 +58,22 @@ impl JobExecutor {
                     job_result.save().unwrap();
                 }
 
-                result = Self::execute_job_result(&mut job_result, &directory, &mut merged_parameters, &cloned_cancellation_token) => {
+                result = cloned_self.execute_job_result(&mut job_result, &directory, &mut merged_parameters, &cloned_cancellation_token) => {
                     if let Err(e) = result {
                         eprintln!("Job execution failed: {}", e);
                     }
                 }
             }
+
+            // Remove the cancellation token after execution
+            cloned_self.cancellation_tokens.lock().await.remove(&id);
         });
 
-        Ok(id)
+        Ok(cloned_id)
     }
 
-    pub async fn execute_job_result(
+    async fn execute_job_result(
+        &self,
         job_result: &mut JobResult,
         directory: &Path,
         parameters: &mut HashMap<String, ScriptParameterType>,
@@ -78,7 +99,7 @@ impl JobExecutor {
                 cancellation_token,
             };
 
-            if let Err(e) = current_step.execute(&mut context).await {
+            if let Err(e) = Box::pin(current_step.execute(&mut context)).await {
                 let message = format!("Error in step {}: {}", step_name, e);
                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
                 job_result.finish_step(false)?;
@@ -109,6 +130,7 @@ impl JobExecutor {
     }
 
     pub async fn validate(
+        &self,
         job: &Job,
         script: &Script,
         parameters: HashMap<String, ScriptParameterType>,
@@ -117,12 +139,21 @@ impl JobExecutor {
         let mut job_result = JobResult::try_from((job, script, true))?;
         let directory = PathBuf::from("tmp");
 
-        Self::execute_job_result(
+        self.execute_job_result(
             &mut job_result,
             &directory,
             &mut merged_parameters,
             &CancellationToken::new(),
         )
         .await
+    }
+
+    pub async fn stop_job(&self, id: &str) -> Result<(), String> {
+        if let Some(token) = self.cancellation_tokens.lock().await.get(id) {
+            token.cancel();
+            Ok(())
+        } else {
+            Err(format!("No active job found with id: {}", id))
+        }
     }
 }

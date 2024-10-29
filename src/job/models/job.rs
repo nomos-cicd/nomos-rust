@@ -17,7 +17,7 @@ use crate::{
 
 use super::{trigger::TriggerType, TriggerPlaceHolder};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Job {
     pub id: String,
     pub name: String,
@@ -42,7 +42,8 @@ impl Job {
         }
 
         let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read job file: {}", e))?;
-        serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse job YAML: {}", e))
+        let job: Job = serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse job YAML: {}", e))?;
+        Ok(Some(job))
     }
 
     pub fn get_all() -> Result<Vec<Self>, String> {
@@ -104,9 +105,9 @@ impl Job {
         fs::remove_file(&path).map_err(|e| format!("Failed to delete job file {}: {}", path.display(), e))
     }
 
-    pub fn execute(&self, parameters: HashMap<String, ScriptParameterType>) -> Result<String, String> {
+    pub async fn execute(&self, executor: &JobExecutor, parameters: HashMap<String, ScriptParameterType>) -> Result<String, String> {
         let script = self.get_script(None)?;
-        JobExecutor::execute_with_script(self, parameters, &script)
+        executor.execute_with_script(self, parameters, &script).await
     }
 
     pub async fn validate(
@@ -116,7 +117,8 @@ impl Job {
     ) -> Result<(), String> {
         self.validate_parameters(script)?;
         let script = self.get_script(script)?;
-        JobExecutor::validate(self, &script, parameters).await
+        let executor = JobExecutor::new();
+        executor.validate(self, &script, parameters).await
     }
 
     pub fn validate_parameters(&self, script: Option<&Script>) -> Result<(), String> {

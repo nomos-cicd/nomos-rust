@@ -5,10 +5,9 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{oneshot, Mutex};
+use std::sync::Arc;
 
-use crate::job::JobResult;
+use crate::job::{JobExecutor, JobResult};
 
 #[derive(Deserialize)]
 pub struct JobResultsQuery {
@@ -37,18 +36,12 @@ pub async fn get_job_result(Path(id): Path<String>) -> Response {
     }
 }
 
-pub async fn stop_job(
-    Path(id): Path<String>,
-    State(abort_senders): State<Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>>,
-) -> Response {
-    let mut abort_senders = abort_senders.lock().await;
-    if let Some(abort_sender) = abort_senders.remove(&id) {
-        if abort_sender.send(()).is_ok() {
-            StatusCode::OK.into_response()
-        } else {
+pub async fn stop_job(State(executor): State<Arc<JobExecutor>>, Path(id): Path<String>) -> Response {
+    match executor.stop_job(&id).await {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => {
+            eprintln!("Failed to stop job {}: {}", id, e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
-    } else {
-        StatusCode::NOT_FOUND.into_response()
     }
 }
