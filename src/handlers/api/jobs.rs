@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use axum::{
     extract::{Path, Query, State},
@@ -10,9 +10,10 @@ use serde::Deserialize;
 
 use crate::{
     credential::{Credential, CredentialType},
-    job::{GithubPayload, Job, JobExecutor, TriggerType},
+    job::{GithubPayload, Job, TriggerType},
     script::{models::Script, ScriptParameterType},
     utils::is_signature_valid,
+    AppState,
 };
 
 #[derive(Deserialize)]
@@ -52,13 +53,13 @@ pub async fn create_job(Json(job): Json<Job>) -> Response {
     }
 }
 
-pub async fn execute_job(
-    State(executor): State<Arc<JobExecutor>>,
+pub fn execute_job(
+    State(state): State<AppState>,
     Path(id): Path<String>,
     Json(parameters): Json<HashMap<String, ScriptParameterType>>,
 ) -> Response {
     match Job::get(&id) {
-        Ok(Some(job)) => match job.execute(&executor, parameters).await {
+        Ok(Some(job)) => match job.execute(&state.job_executor, parameters) {
             Ok(job_result_id) => Json(job_result_id).into_response(),
             Err(e) => {
                 eprintln!("Failed to execute job {}: {}", id, e);
@@ -109,11 +110,7 @@ pub async fn dry_run_job(Json(payload): Json<DryRunJobPayload>) -> Response {
     }
 }
 
-pub async fn job_webhook_trigger(
-    State(executor): State<Arc<JobExecutor>>,
-    headers: HeaderMap,
-    body: String,
-) -> Response {
+pub async fn job_webhook_trigger(State(state): State<AppState>, headers: HeaderMap, body: String) -> Response {
     match Job::get_all() {
         Ok(jobs) => {
             for job in jobs {
@@ -178,7 +175,7 @@ pub async fn job_webhook_trigger(
                                                     ScriptParameterType::String(body.clone()),
                                                 );
 
-                                                match job.execute(&executor, params).await {
+                                                match job.execute(&state.job_executor, params).await {
                                                     Ok(result) => eprintln!("Job started: {}", result),
                                                     Err(e) => eprintln!("Failed to execute job: {}", e),
                                                 }

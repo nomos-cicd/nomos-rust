@@ -20,40 +20,13 @@ use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if !cfg!(debug_assertions) {
-        let _ = std::env::var("NOMOS_USERNAME").map_err(|_| {
-            eprintln!("NOMOS_USERNAME environment variable is not set.");
-            std::process::exit(1);
-        });
-        let _ = std::env::var("NOMOS_PASSWORD").map_err(|_| {
-            eprintln!("NOMOS_PASSWORD environment variable is not set.");
-            std::process::exit(1);
-        });
-    }
+#[derive(Clone)]
+struct AppState {
+    job_executor: Arc<JobExecutor>,
+}
 
-    // initialize tracing
-    tracing_subscriber::registry()
-        .with(EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "axum_login=debug,tower_http=debug".into()),
-        ))
-        .with(tracing_subscriber::fmt::layer())
-        .try_init()?;
-
-    // Session layer.
-    let session_store = MemoryStore::default();
-    let session_layer = SessionManagerLayer::new(session_store);
-
-    // Auth service.
-    let backend = Backend::default();
-    let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
-
-    // Create JobExecutor
-    let job_executor = Arc::new(JobExecutor::new());
-
-    // build our application with a route
-    let mut app = Router::new()
+fn create_router() -> Router<AppState> {
+    Router::new()
         .route("/api/credentials", routing::get(get_credentials))
         .route("/api/credentials/:id", routing::get(get_credential))
         .route("/api/credentials", routing::post(create_credential))
@@ -88,7 +61,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
         .route("/job-results/:id/header", routing::get(template_job_result_header))
         .route("/job-results/:id/steps", routing::get(template_job_result_steps))
-        .with_state(job_executor.clone());
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if !cfg!(debug_assertions) {
+        let _ = std::env::var("NOMOS_USERNAME").map_err(|_| {
+            eprintln!("NOMOS_USERNAME environment variable is not set.");
+            std::process::exit(1);
+        });
+        let _ = std::env::var("NOMOS_PASSWORD").map_err(|_| {
+            eprintln!("NOMOS_PASSWORD environment variable is not set.");
+            std::process::exit(1);
+        });
+    }
+
+    // initialize tracing
+    tracing_subscriber::registry()
+        .with(EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "axum_login=debug,tower_http=debug".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .try_init()?;
+
+    // Session layer.
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store);
+
+    // Auth service.
+    let backend = Backend::default();
+    let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
+
+    let mut app = create_router();
 
     // Only add authentication layer in release mode
     if !cfg!(debug_assertions) {
@@ -102,11 +106,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(auth_layer)
         .layer(CorsLayer::permissive());
 
+    // Apply state to the router
+    let app_state = AppState {
+        job_executor: Arc::new(JobExecutor::new()),
+    };
+    let app = app.with_state(app_state);
+
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
         .map_err(|e| e.to_string())?;
-    axum::serve(listener, app)?;
-
-    Ok(())
+    axum::serve(listener, app).await.map_err(|e| e.into())
 }
