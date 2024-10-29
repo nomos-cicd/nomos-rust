@@ -8,7 +8,7 @@ mod script;
 mod settings;
 mod utils;
 
-use axum::{routing, Router};
+use axum::{routing, Router, Extension};
 use axum_login::{
     login_required,
     tower_sessions::{MemoryStore, SessionManagerLayer},
@@ -17,6 +17,9 @@ use axum_login::{
 use handlers::*;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use std::sync::Arc;
+use tokio::sync::{Mutex, oneshot};
+use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,6 +50,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = Backend::default();
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
+    // Shared state for abort senders
+    let abort_senders = Arc::new(Mutex::new(HashMap::<String, oneshot::Sender<()>>::new()));
+
     // build our application with a route
     let mut app = Router::new()
         .route("/api/credentials", routing::get(get_credentials))
@@ -65,6 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/jobs/dry-run", routing::post(dry_run_job))
         .route("/api/job-results", routing::get(get_job_results))
         .route("/api/job-results/:id", routing::get(get_job_result))
+        .route("/api/job-results/:id/stop", routing::post(stop_job))
         .route("/", routing::get(template_job_results))
         .route("/credentials", routing::get(template_credentials))
         .route("/credentials/create", routing::get(template_create_credential))
@@ -81,7 +88,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/job-results/:id", routing::get(template_job_result))
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
         .route("/job-results/:id/header", routing::get(template_job_result_header))
-        .route("/job-results/:id/steps", routing::get(template_job_result_steps));
+        .route("/job-results/:id/steps", routing::get(template_job_result_steps))
+        .layer(Extension(abort_senders));
 
     // Only add authentication layer in release mode
     if !cfg!(debug_assertions) {

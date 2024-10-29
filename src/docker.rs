@@ -1,26 +1,29 @@
 use std::path::Path;
 
-use crate::{job::JobResult, log::LogLevel, utils::execute_command};
+use crate::script::ScriptExecutionContext;
+
+use crate::{log::LogLevel, utils::execute_command};
 
 /// docker run -d {..args}
-pub fn docker_run(image: &str, args: Vec<&str>, directory: &Path, job_result: &mut JobResult) -> Result<(), String> {
+pub async fn docker_run(image: &str, args: Vec<&str>, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
     let mut command = vec!["docker", "run", "-d"];
     command.extend(args);
     command.push(image);
 
-    job_result.add_log(LogLevel::Info, format!("command: docker run -d <args> {}", image));
-    if !job_result.dry_run {
-        execute_command(&command.join(" "), directory, job_result)?;
+    context
+        .job_result
+        .add_log(LogLevel::Info, format!("command: docker run -d <args> {}", image));
+    if !context.job_result.dry_run {
+        execute_command(&command.join(" "), context).await?;
     }
     Ok(())
 }
 
 /// docker build -t {image} -f {dockerfile}
-pub fn docker_build(
+pub async fn docker_build(
     image: &str,
     dockerfile: &Path,
-    directory: &Path,
-    job_result: &mut JobResult,
+    context: &mut ScriptExecutionContext<'_>,
 ) -> Result<(), String> {
     let dockerfile_dir = match dockerfile.parent() {
         Some(dir) => dir,
@@ -38,21 +41,27 @@ pub fn docker_build(
         image,
         dockerfile.display()
     );
-    job_result.add_log(LogLevel::Info, format!("command: {}", command));
-    if !job_result.dry_run {
-        execute_command(&command, directory, job_result)?;
+    context
+        .job_result
+        .add_log(LogLevel::Info, format!("command: {}", command));
+    if !context.job_result.dry_run {
+        execute_command(&command, context).await?;
     }
     Ok(())
 }
 
 /// docker stop {container} && docker rm {container}
-pub fn docker_stop_and_rm(container: &str, directory: &Path, job_result: &mut JobResult) {
-    job_result.add_log(LogLevel::Info, format!("command: docker stop {}", container));
-    if !job_result.dry_run {
-        let _ = execute_command(&format!("docker stop {}", container), directory, job_result);
+pub async fn docker_stop_and_rm(container: &str, context: &mut ScriptExecutionContext<'_>) {
+    context
+        .job_result
+        .add_log(LogLevel::Info, format!("command: docker stop {}", container));
+    if !context.job_result.dry_run {
+        let _ = execute_command(&format!("docker stop {}", container), context).await;
     }
-    job_result.add_log(LogLevel::Info, format!("command: docker rm {}", container));
-    if !job_result.dry_run {
-        let _ = execute_command(&format!("docker rm {}", container), directory, job_result);
+    context
+        .job_result
+        .add_log(LogLevel::Info, format!("command: docker rm {}", container));
+    if !context.job_result.dry_run {
+        let _ = execute_command(&format!("docker rm {}", container), context).await;
     }
 }

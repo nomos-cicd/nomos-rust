@@ -18,7 +18,7 @@ pub struct GitCloneScript {
 }
 
 impl ScriptExecutor for GitCloneScript {
-    fn execute(&self, context: &mut ScriptExecutionContext) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Substitute parameters
         let url = self
             .url
@@ -61,13 +61,7 @@ impl ScriptExecutor for GitCloneScript {
             None => "main".to_string(),
         };
 
-        git_clone(
-            &url,
-            branch.as_str(),
-            context.directory,
-            credential_id.as_deref(),
-            context.job_result,
-        )?;
+        git_clone(&url, branch.as_str(), credential_id.as_deref(), context).await?;
 
         let mut new_dir = match url.split('/').last() {
             Some(last_part) => context.directory.join(last_part),

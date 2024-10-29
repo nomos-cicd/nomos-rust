@@ -3,6 +3,8 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use tokio::select;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     job::models::{Job, JobResult},
@@ -27,20 +29,34 @@ impl JobExecutor {
         fs::create_dir_all(&directory).map_err(|e| format!("Failed to create job result directory: {}", e))?;
 
         job_result.save()?;
+        let cancellation_token = CancellationToken::new();
 
+        let cloned_cancellation_token = cancellation_token.clone();
         tokio::spawn(async move {
-            if let Err(e) = Self::execute_job_result(&mut job_result, &directory, &mut merged_parameters) {
-                eprintln!("Job execution failed: {}", e);
+            select! {
+                _ = cloned_cancellation_token.cancelled() => {
+                    job_result.add_log(crate::log::LogLevel::Info, "Job execution cancelled".to_string());
+                    job_result.finish_step(false);
+                    job_result.is_success = false;
+                    job_result.save().unwrap();
+                }
+
+                result = Self::execute_job_result(&mut job_result, &directory, &mut merged_parameters, &cloned_cancellation_token) => {
+                    if let Err(e) = result {
+                        eprintln!("Job execution failed: {}", e);
+                    }
+                }
             }
         });
 
         Ok(id)
     }
 
-    pub fn execute_job_result(
+    pub async fn execute_job_result(
         job_result: &mut JobResult,
         directory: &Path,
         parameters: &mut HashMap<String, ScriptParameterType>,
+        cancellation_token: &CancellationToken,
     ) -> Result<(), String> {
         let mut is_success = true;
 
@@ -59,8 +75,10 @@ impl JobExecutor {
                 directory,
                 step_name: &step_name,
                 job_result,
+                cancellation_token,
             };
-            if let Err(e) = current_step.execute(&mut context) {
+
+            if let Err(e) = current_step.execute(&mut context).await {
                 let message = format!("Error in step {}: {}", step_name, e);
                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
                 job_result.finish_step(false)?;
@@ -90,7 +108,7 @@ impl JobExecutor {
         Ok(())
     }
 
-    pub fn validate(
+    pub async fn validate(
         job: &Job,
         script: &Script,
         parameters: HashMap<String, ScriptParameterType>,
@@ -99,6 +117,12 @@ impl JobExecutor {
         let mut job_result = JobResult::try_from((job, script, true))?;
         let directory = PathBuf::from("tmp");
 
-        Self::execute_job_result(&mut job_result, &directory, &mut merged_parameters)
+        Self::execute_job_result(
+            &mut job_result,
+            &directory,
+            &mut merged_parameters,
+            &CancellationToken::new(),
+        )
+        .await
     }
 }

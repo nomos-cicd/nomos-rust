@@ -24,6 +24,7 @@ hex = "0.4.3"
 sha2 = "0.10.8"
 hmac = "0.12.1"
 axum-login = "0.16.0"
+tokio-util = "0.7.12"
 
 [lib]
 name = "nomos_rust"

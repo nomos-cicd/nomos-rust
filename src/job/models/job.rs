@@ -62,8 +62,8 @@ impl Job {
         Ok(jobs)
     }
 
-    pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
-        self.validate(None, Default::default())?;
+    pub async fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
+        self.validate(None, Default::default()).await?;
 
         match Job::get(&self.id)? {
             Some(existing_job) => {
@@ -109,14 +109,14 @@ impl Job {
         JobExecutor::execute_with_script(self, parameters, &script)
     }
 
-    pub fn validate(
+    pub async fn validate(
         &self,
         script: Option<&Script>,
         parameters: HashMap<String, ScriptParameterType>,
     ) -> Result<(), String> {
         self.validate_parameters(script)?;
         let script = self.get_script(script)?;
-        JobExecutor::validate(self, &script, parameters)
+        JobExecutor::validate(self, &script, parameters).await
     }
 
     pub fn validate_parameters(&self, script: Option<&Script>) -> Result<(), String> {
