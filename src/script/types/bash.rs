@@ -15,7 +15,7 @@ pub struct BashScript {
 }
 
 impl ScriptExecutor for BashScript {
-    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Replace all parameter references in the code
         let replaced_code = self.code.substitute_parameters(context.parameters, false)?;
         let replaced_code = match replaced_code {
@@ -40,7 +40,7 @@ impl ScriptExecutor for BashScript {
                 .job_result
                 .add_log(LogLevel::Info, format!("command: {}", original_lines[i]));
             if !context.job_result.dry_run {
-                execute_command(line, context).await?;
+                execute_command(line, context)?;
             }
             i += 1;
         }

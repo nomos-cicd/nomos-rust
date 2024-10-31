@@ -9,6 +9,10 @@
                 hx-get="/job-results/{{ result.id }}/header"
                 hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML">
             </div>
+            <button class="uk-button uk-button-danger" hx-post="/api/job-results/{{ result.id }}/stop"
+                hx-trigger="click" hx-swap="none">
+                Abort
+            </button>
         </div>
 
         <!-- Spacer -->

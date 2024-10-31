@@ -59,7 +59,7 @@ impl TryFrom<PathBuf> for Settings {
     }
 }
 
-pub async fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
+pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
     if job_result.dry_run {
         job_result.add_log(LogLevel::Info, "Dry run enabled, skipping sync".to_string());
         return Ok(());
@@ -112,7 +112,7 @@ pub async fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), 
                         job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
                         continue;
                     }
-                    match job.sync(job_result.into()).await {
+                    match job.sync(job_result.into()) {
                         Ok(_) => job_ids.push(job.id.clone()),
                         Err(e) => job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e)),
                     }

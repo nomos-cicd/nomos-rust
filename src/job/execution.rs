@@ -48,25 +48,30 @@ impl JobExecutor {
         self.cancellation_tokens.lock().await.insert(id.clone(), cancellation_token.clone());
 
         let cloned_cancellation_token = cancellation_token.clone();
-        let cloned_self = self.clone();
         tokio::spawn(async move {
             select! {
+                // _ = cloned_cancellation_token.cancelled() => {
+                //     job_result.add_log(crate::log::LogLevel::Info, "Job execution cancelled".to_string());
+                //     job_result.finish_step(false);
+                //     job_result.is_success = false;
+                //     job_result.save().unwrap();
+                // }
+
+                result = self.execute_job_result(&mut job_result, &directory, &mut merged_parameters, &cloned_cancellation_token) => {
+                    if let Err(e) = result {
+                        eprintln!("Job execution failed: {}", e);
+                    }
+                }
                 _ = cloned_cancellation_token.cancelled() => {
                     job_result.add_log(crate::log::LogLevel::Info, "Job execution cancelled".to_string());
                     job_result.finish_step(false);
                     job_result.is_success = false;
                     job_result.save().unwrap();
                 }
-
-                result = cloned_self.execute_job_result(&mut job_result, &directory, &mut merged_parameters, &cloned_cancellation_token) => {
-                    if let Err(e) = result {
-                        eprintln!("Job execution failed: {}", e);
-                    }
-                }
             }
 
             // Remove the cancellation token after execution
-            cloned_self.cancellation_tokens.lock().await.remove(&id);
+            self.cancellation_tokens.lock().await.remove(&id);
         });
 
         Ok(cloned_id)
@@ -99,7 +104,7 @@ impl JobExecutor {
                 cancellation_token,
             };
 
-            if let Err(e) = Box::pin(current_step.execute(&mut context)).await {
+            if let Err(e) = current_step.execute(&mut context) {
                 let message = format!("Error in step {}: {}", step_name, e);
                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
                 job_result.finish_step(false)?;

@@ -44,7 +44,7 @@ pub async fn get_job(Path(id): Path<String>) -> Response {
 }
 
 pub async fn create_job(Json(job): Json<Job>) -> Response {
-    match job.sync(None).await {
+    match job.sync(None) {
         Ok(_) => (StatusCode::CREATED, Json(job)).into_response(),
         Err(e) => {
             eprintln!("Failed to create job: {}", e);
@@ -53,14 +53,14 @@ pub async fn create_job(Json(job): Json<Job>) -> Response {
     }
 }
 
-pub fn execute_job(
+pub async fn execute_job(
     State(state): State<AppState>,
     Path(id): Path<String>,
     Json(parameters): Json<HashMap<String, ScriptParameterType>>,
 ) -> Response {
     match Job::get(&id) {
-        Ok(Some(job)) => match job.execute(&state.job_executor, parameters) {
-            Ok(job_result_id) => Json(job_result_id).into_response(),
+        Ok(Some(job)) => match job.execute(&state.job_executor, parameters).await {
+            Ok(job_result_id) => job_result_id.into_response(),
             Err(e) => {
                 eprintln!("Failed to execute job {}: {}", id, e);
                 StatusCode::INTERNAL_SERVER_ERROR.into_response()

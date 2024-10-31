@@ -8,7 +8,7 @@ use crate::{
     utils::{execute_command, execute_command_with_env},
 };
 
-pub async fn git_clone(
+pub fn git_clone(
     url: &str,
     branch: &str,
     credential_id: Option<&str>,
@@ -17,7 +17,7 @@ pub async fn git_clone(
     if cfg!(target_os = "windows") {
         if !context.job_result.dry_run {
             // Workaround for local
-            execute_command(&format!("git clone -b {} {}", branch, url), context).await?;
+            execute_command(&format!("git clone -b {} {}", branch, url), context)?;
         }
 
         Ok(())
@@ -40,13 +40,13 @@ pub async fn git_clone(
                     let tmp_path = tmp_file.path();
                     std::fs::write(tmp_path, ssh_credential.private_key).map_err(|e| e.to_string())?;
 
-                    execute_command(&format!("chmod 400 {}", tmp_path.display()), context).await?;
+                    execute_command(&format!("chmod 400 {}", tmp_path.display()), context)?;
 
                     let env = vec![(
                         "GIT_SSH_COMMAND".to_string(),
                         format!("ssh -i {} -o StrictHostKeyChecking=no", tmp_path.display()),
                     )];
-                    execute_command_with_env(&format!("git clone -b {} {}", branch, url), env, context).await?;
+                    execute_command_with_env(&format!("git clone -b {} {}", branch, url), env, context)?;
                 }
 
                 Ok(())

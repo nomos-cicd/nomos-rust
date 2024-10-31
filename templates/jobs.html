@@ -57,6 +57,10 @@
     async function runJob(jobId) {
         try {
             const response = await fetch(`/api/jobs/${jobId}/execute`, {
+                body: JSON.stringify({}),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 method: 'POST'
             });
 

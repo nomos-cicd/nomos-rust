@@ -17,7 +17,7 @@ pub struct SyncScript {
 }
 
 impl ScriptExecutor for SyncScript {
-    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get directory with parameter substitution
         let param_directory_str = self
             .directory
@@ -40,6 +40,6 @@ impl ScriptExecutor for SyncScript {
             param_directory = context.directory.join(param_directory);
         }
 
-        settings::sync(param_directory, context.job_result).await
+        settings::sync(param_directory, context.job_result)
     }
 }

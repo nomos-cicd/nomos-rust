@@ -5,9 +5,8 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use std::sync::Arc;
 
-use crate::job::{JobExecutor, JobResult};
+use crate::{job::JobResult, AppState};
 
 #[derive(Deserialize)]
 pub struct JobResultsQuery {
@@ -36,8 +35,8 @@ pub async fn get_job_result(Path(id): Path<String>) -> Response {
     }
 }
 
-pub async fn stop_job(State(executor): State<Arc<JobExecutor>>, Path(id): Path<String>) -> Response {
-    match executor.stop_job(&id).await {
+pub async fn stop_job(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    match state.job_executor.stop_job(&id).await {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => {
             eprintln!("Failed to stop job {}: {}", id, e);

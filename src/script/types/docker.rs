@@ -18,7 +18,7 @@ pub struct DockerBuildScript {
 }
 
 impl ScriptExecutor for DockerBuildScript {
-    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get image name with parameter substitution
         let image = self
             .image
@@ -65,7 +65,7 @@ impl ScriptExecutor for DockerBuildScript {
                 dockerfile_path.display()
             ));
         }
-        docker_build(&image, &dockerfile_path, context).await
+        docker_build(&image, &dockerfile_path, context)
     }
 }
 
@@ -76,7 +76,7 @@ pub struct DockerStopScript {
 }
 
 impl ScriptExecutor for DockerStopScript {
-    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get container name with parameter substitution
         let container = self
             .container
@@ -89,7 +89,7 @@ impl ScriptExecutor for DockerStopScript {
             }
         };
 
-        docker_stop_and_rm(&container, context).await;
+        docker_stop_and_rm(&container, context);
         Ok(())
     }
 }
@@ -109,7 +109,7 @@ pub struct DockerRunScript {
 }
 
 impl ScriptExecutor for DockerRunScript {
-    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get image name with parameter substitution
         let image = self
             .image
@@ -182,6 +182,6 @@ impl ScriptExecutor for DockerRunScript {
         // Convert to &str for docker_run function
         let args_ref: Vec<&str> = final_args.iter().map(|s| s.as_str()).collect();
 
-        docker_run(&image, args_ref, context).await
+        docker_run(&image, args_ref, context)
     }
 }

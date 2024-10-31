@@ -5,7 +5,7 @@ use crate::script::ScriptExecutionContext;
 use crate::{log::LogLevel, utils::execute_command};
 
 /// docker run -d {..args}
-pub async fn docker_run(image: &str, args: Vec<&str>, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+pub fn docker_run(image: &str, args: Vec<&str>, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
     let mut command = vec!["docker", "run", "-d"];
     command.extend(args);
     command.push(image);
@@ -14,13 +14,13 @@ pub async fn docker_run(image: &str, args: Vec<&str>, context: &mut ScriptExecut
         .job_result
         .add_log(LogLevel::Info, format!("command: docker run -d <args> {}", image));
     if !context.job_result.dry_run {
-        execute_command(&command.join(" "), context).await?;
+        execute_command(&command.join(" "), context)?;
     }
     Ok(())
 }
 
 /// docker build -t {image} -f {dockerfile}
-pub async fn docker_build(
+pub fn docker_build(
     image: &str,
     dockerfile: &Path,
     context: &mut ScriptExecutionContext<'_>,
@@ -45,23 +45,23 @@ pub async fn docker_build(
         .job_result
         .add_log(LogLevel::Info, format!("command: {}", command));
     if !context.job_result.dry_run {
-        execute_command(&command, context).await?;
+        execute_command(&command, context);
     }
     Ok(())
 }
 
 /// docker stop {container} && docker rm {container}
-pub async fn docker_stop_and_rm(container: &str, context: &mut ScriptExecutionContext<'_>) {
+pub fn docker_stop_and_rm(container: &str, context: &mut ScriptExecutionContext<'_>) {
     context
         .job_result
         .add_log(LogLevel::Info, format!("command: docker stop {}", container));
     if !context.job_result.dry_run {
-        let _ = execute_command(&format!("docker stop {}", container), context).await;
+        let _ = execute_command(&format!("docker stop {}", container), context);
     }
     context
         .job_result
         .add_log(LogLevel::Info, format!("command: docker rm {}", container));
     if !context.job_result.dry_run {
-        let _ = execute_command(&format!("docker rm {}", container), context).await;
+        let _ = execute_command(&format!("docker rm {}", container), context);
     }
 }
