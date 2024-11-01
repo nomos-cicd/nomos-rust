@@ -8,9 +8,9 @@
     {% endif %}
 </p>
 <span
-    class="uk-label uk-label-{% if result.finished_at.is_some() %}{% if result.is_success %}success{% else %}danger{% endif %}{% else %}warning{% endif %}">
+    class="uk-label uk-label-{% if result.finished_at.is_some() %}{% if result.status == crate::script::models::ScriptStatus::Success %}success{% else if result.status == crate::script::models::ScriptStatus::Failed %}danger{% else if result.status == crate::script::models::ScriptStatus::Aborted %}warning{% else %}default{% endif %}{% else %}primary{% endif %}">
     {% if result.finished_at.is_some() %}
-    {% if result.is_success %}Success{% else %}Failed{% endif %}
+    {{ result.status }}
     {% else %}
     In Progress
     {% endif %}

@@ -23,16 +23,20 @@
             <td>{{ result.job_id }}</td>
             <td>
                 {% if result.finished_at.is_some() %}
-                {% if result.is_success %}
+                {% if result.status == crate::script::models::ScriptStatus::Success %}
                 <span class="uk-label uk-label-success">Success</span>
-                {% else %}
+                {% else if result.status == crate::script::models::ScriptStatus::Failed %}
                 <span class="uk-label uk-label-danger">Failed</span>
+                {% else %}
+                <span class="uk-label uk-label-warning">Aborted</span>
                 {% endif %}
                 {% else %}
                 <span class="uk-label">In Progress</span>
                 {% endif %}
             </td>
-            <td>{{ result.started_at }}</td>
+            <td>
+                {{ result.started_at }}
+            </td>
             <td>{{ result.updated_at }}</td>
             <td>
                 {% if result.finished_at.is_some() %}
@@ -56,14 +60,16 @@
                         <li>
                             <div class="uk-grid-small uk-flex-middle" uk-grid>
                                 <div class="uk-width-auto">
-                                    {% if step.is_finished %}
-                                    {% if step.is_success %}
+                                    {% if step.finished_at.is_some() %}
+                                    {% if step.status == crate::script::models::ScriptStatus::Success %}
                                     <span style="color: green;">✓</span>
-                                    {% else %}
+                                    {% else if step.status == crate::script::models::ScriptStatus::Failed %}
                                     <span style="color: red;">✗</span>
+                                    {% else %}
+                                    <span style="color: orange;">⚠</span>
                                     {% endif %}
                                     {% else %}
-                                    {% if step.is_started %}
+                                    {% if step.started_at.is_some() %}
                                     <div uk-spinner></div>
                                     {% else %}
                                     <span>⏱</span>
@@ -72,11 +78,13 @@
                                 </div>
                                 <div class="uk-width-expand">
                                     <h4 class="uk-margin-remove">{{ step.name }}</h4>
-                                    {% if step.is_started %}
+                                    {% if step.started_at.is_some() %}
                                     <p class="uk-text-small uk-text-muted uk-margin-remove">
-                                        Started: {{ step.started_at }}
-                                        {% if step.is_finished %}
-                                        | Finished: {{ step.finished_at }}
+                                        {% if step.started_at.is_some() %}
+                                        Started: {{ step.started_at.unwrap() }}
+                                        {% endif %}
+                                        {% if step.finished_at.is_some() %}
+                                        | Finished: {{ step.finished_at.unwrap() }}
                                         {% endif %}
                                     </p>
                                     {% endif %}

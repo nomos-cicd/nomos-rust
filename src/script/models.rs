@@ -1,9 +1,11 @@
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{fmt::Display, fs::File, io::BufReader, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{job::JobResult, log::LogLevel};
+
+use super::{default_scripts_location, types::ScriptType, ScriptParameter};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum ScriptStatus {
@@ -15,7 +17,15 @@ pub enum ScriptStatus {
     Aborted,
 }
 
-use super::{default_scripts_location, types::ScriptType, ScriptParameter};
+impl Display for ScriptStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScriptStatus::Success => write!(f, "Success"),
+            ScriptStatus::Failed => write!(f, "Failed"),
+            ScriptStatus::Aborted => write!(f, "Aborted"),
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Script {
