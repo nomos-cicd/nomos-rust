@@ -10,6 +10,7 @@ use crate::{
         ScriptExecutionContext, ScriptExecutor,
     },
 };
+use async_trait::async_trait;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct DockerBuildScript {
@@ -17,8 +18,9 @@ pub struct DockerBuildScript {
     pub dockerfile: Option<String>,
 }
 
+#[async_trait]
 impl ScriptExecutor for DockerBuildScript {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get image name with parameter substitution
         let image = self
             .image
@@ -65,7 +67,8 @@ impl ScriptExecutor for DockerBuildScript {
                 dockerfile_path.display()
             ));
         }
-        docker_build(&image, &dockerfile_path, context)
+        tokio::task::yield_now().await;
+        docker_build(&image, &dockerfile_path, context).await
     }
 }
 
@@ -75,8 +78,9 @@ pub struct DockerStopScript {
     pub container: String,
 }
 
+#[async_trait]
 impl ScriptExecutor for DockerStopScript {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get container name with parameter substitution
         let container = self
             .container
@@ -89,7 +93,8 @@ impl ScriptExecutor for DockerStopScript {
             }
         };
 
-        docker_stop_and_rm(&container, context);
+        tokio::task::yield_now().await;
+        docker_stop_and_rm(&container, context).await;
         Ok(())
     }
 }
@@ -108,8 +113,9 @@ pub struct DockerRunScript {
     pub args: Vec<DockerRunArg>,
 }
 
+#[async_trait]
 impl ScriptExecutor for DockerRunScript {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get image name with parameter substitution
         let image = self
             .image
@@ -182,6 +188,7 @@ impl ScriptExecutor for DockerRunScript {
         // Convert to &str for docker_run function
         let args_ref: Vec<&str> = final_args.iter().map(|s| s.as_str()).collect();
 
-        docker_run(&image, args_ref, context)
+        tokio::task::yield_now().await;
+        docker_run(&image, args_ref, context).await
     }
 }

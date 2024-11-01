@@ -1,44 +1,49 @@
 use std::{collections::HashMap, path::Path};
 
-use tokio_util::sync::CancellationToken;
-
 use crate::{job::JobResult, log::LogLevel};
 
 use super::{models::RunningScriptStep, types::ScriptType, ScriptParameterType};
+use async_trait::async_trait;
 
 pub struct ScriptExecutionContext<'a> {
     pub parameters: &'a mut HashMap<String, ScriptParameterType>,
     pub directory: &'a Path,
     pub step_name: &'a str,
     pub job_result: &'a mut JobResult,
-    pub cancellation_token: &'a CancellationToken,
 }
 
+#[async_trait]
 pub trait ScriptExecutor {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String>;
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String>;
 }
 
+#[async_trait]
 impl ScriptExecutor for RunningScriptStep {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+        tokio::task::yield_now().await;
         context
             .job_result
             .add_log(LogLevel::Info, format!("Executing step: {}", context.step_name));
         for value in self.values.iter() {
-            value.execute(context);
+            tokio::task::yield_now().await;
+            value.execute(context).await?;
+            tokio::task::yield_now().await;
         }
+        tokio::task::yield_now().await;
         Ok(())
     }
 }
 
+#[async_trait]
 impl ScriptExecutor for ScriptType {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         match self {
-            ScriptType::Bash(bash) => bash.execute(context),
-            ScriptType::GitClone(git_clone) => git_clone.execute(context),
-            ScriptType::Sync(sync) => sync.execute(context),
-            ScriptType::DockerBuild(docker_build) => docker_build.execute(context),
-            ScriptType::DockerStop(docker_stop) => docker_stop.execute(context),
-            ScriptType::DockerRun(docker_run) => docker_run.execute(context),
+            ScriptType::Bash(bash) => bash.execute(context).await,
+            ScriptType::GitClone(git_clone) => git_clone.execute(context).await,
+            ScriptType::Sync(sync) => sync.execute(context).await,
+            ScriptType::DockerBuild(docker_build) => docker_build.execute(context).await,
+            ScriptType::DockerStop(docker_stop) => docker_stop.execute(context).await,
+            ScriptType::DockerRun(docker_run) => docker_run.execute(context).await,
         }
     }
 }

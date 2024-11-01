@@ -63,34 +63,32 @@ impl Job {
         Ok(jobs)
     }
 
-    pub fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
-        async {
-            self.validate(None, Default::default()).await;
+    pub async fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
+        self.validate(None, Default::default()).await?;
 
-            match Job::get(&self.id).ok().flatten() {
-                Some(existing_job) => {
-                    let needs_update = existing_job.name != self.name
-                        || existing_job.parameters != self.parameters
-                        || existing_job.triggers != self.triggers
-                        || existing_job.script_id != self.script_id;
+        match Job::get(&self.id).ok().flatten() {
+            Some(existing_job) => {
+                let needs_update = existing_job.name != self.name
+                    || existing_job.parameters != self.parameters
+                    || existing_job.triggers != self.triggers
+                    || existing_job.script_id != self.script_id;
 
-                    if needs_update {
-                        self.save();
-                        if let Some(result) = job_result {
-                            result.add_log(crate::log::LogLevel::Info, format!("Updated job {}", self.id));
-                        }
-                    } else if let Some(result) = job_result {
-                        result.add_log(crate::log::LogLevel::Info, format!("No changes in job {}", self.id));
-                    }
-                }
-                None => {
-                    self.save();
+                if needs_update {
+                    self.save()?;
                     if let Some(result) = job_result {
-                        result.add_log(crate::log::LogLevel::Info, format!("Created job {}", self.id));
+                        result.add_log(crate::log::LogLevel::Info, format!("Updated job {}", self.id));
                     }
+                } else if let Some(result) = job_result {
+                    result.add_log(crate::log::LogLevel::Info, format!("No changes in job {}", self.id));
                 }
             }
-        };
+            None => {
+                self.save()?;
+                if let Some(result) = job_result {
+                    result.add_log(crate::log::LogLevel::Info, format!("Created job {}", self.id));
+                }
+            }
+        }
 
         Ok(())
     }

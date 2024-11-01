@@ -9,6 +9,7 @@ use crate::{
     },
     settings,
 };
+use async_trait::async_trait;
 
 /// Scans directory for credential, script and job files and syncs them with the database.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -16,8 +17,9 @@ pub struct SyncScript {
     pub directory: String,
 }
 
+#[async_trait]
 impl ScriptExecutor for SyncScript {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Get directory with parameter substitution
         let param_directory_str = self
             .directory
@@ -40,6 +42,7 @@ impl ScriptExecutor for SyncScript {
             param_directory = context.directory.join(param_directory);
         }
 
-        settings::sync(param_directory, context.job_result)
+        tokio::task::yield_now().await;
+        settings::sync(param_directory, context.job_result).await
     }
 }

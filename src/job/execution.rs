@@ -4,24 +4,27 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::select;
-use tokio_util::sync::CancellationToken;
-use tokio::sync::Mutex;
+use sysinfo::System;
+use tokio::{
+    sync::Mutex,
+    task::{self},
+};
 
 use crate::{
     job::models::{Job, JobResult},
     script::{models::Script, ScriptExecutionContext, ScriptExecutor, ScriptParameterType},
+    utils::get_process_recursive,
 };
 
 #[derive(Debug, Clone)]
 pub struct JobExecutor {
-    cancellation_tokens: Arc<Mutex<HashMap<String, CancellationToken>>>,
+    handles: Arc<Mutex<HashMap<String, task::AbortHandle>>>,
 }
 
 impl JobExecutor {
     pub fn new() -> Self {
         JobExecutor {
-            cancellation_tokens: Arc::new(Mutex::new(HashMap::new())),
+            handles: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -34,55 +37,84 @@ impl JobExecutor {
         job.validate_parameters(Some(script))?;
 
         let mut merged_parameters = job.merged_parameters(Some(script), parameters.clone())?;
-        let mut job_result = JobResult::try_from((job, script, false))?;
+        let job_result = JobResult::try_from((job, script, false))?;
         let id = job_result.id.clone();
         let cloned_id = id.clone();
+        let other_id = id.clone();
 
         let directory = crate::job::utils::default_job_results_location()?.join(&job_result.id);
         fs::create_dir_all(&directory).map_err(|e| format!("Failed to create job result directory: {}", e))?;
 
         job_result.save()?;
-        let cancellation_token = CancellationToken::new();
 
-        // Store the cancellation token
-        self.cancellation_tokens.lock().await.insert(id.clone(), cancellation_token.clone());
-
-        let cloned_cancellation_token = cancellation_token.clone();
-        tokio::spawn(async move {
-            select! {
-                // _ = cloned_cancellation_token.cancelled() => {
-                //     job_result.add_log(crate::log::LogLevel::Info, "Job execution cancelled".to_string());
-                //     job_result.finish_step(false);
-                //     job_result.is_success = false;
-                //     job_result.save().unwrap();
-                // }
-
-                result = self.execute_job_result(&mut job_result, &directory, &mut merged_parameters, &cloned_cancellation_token) => {
-                    if let Err(e) = result {
-                        eprintln!("Job execution failed: {}", e);
+        let mut job_result_clone = job_result.clone();
+        let handle = task::spawn(async move {
+            let _res =
+                Self::execute_job_result_internal(&mut job_result_clone, &directory, &mut merged_parameters).await;
+        });
+        let abort_handle = handle.abort_handle();
+        task::spawn(async move {
+            match handle.await {
+                Ok(_) => {}
+                Err(e) => {
+                    if e.is_cancelled() {
+                        let message = format!("Cancelled job {}: {}", other_id, e);
+                        match JobResult::get(&other_id.as_str()) {
+                            Ok(Some(mut job_result)) => {
+                                job_result.add_log(crate::log::LogLevel::Error, message.clone());
+                                let s = System::new_all();
+                                for child_process in &job_result.child_process_ids {
+                                    let mut processes = get_process_recursive(child_process.clone());
+                                    processes.reverse(); // Kill child processes first
+                                    eprintln!("Killing processes with PID {}", child_process);
+                                    for process in processes {
+                                        if let Some(process) = s.process(process) {
+                                            job_result.add_log(
+                                                crate::log::LogLevel::Info,
+                                                format!("Killing process with PID {}", process.pid()),
+                                            );
+                                            process.kill();
+                                        } else {
+                                            eprintln!("Process with PID {} not found", process);
+                                        }
+                                    }
+                                }
+                                match job_result.finish_step(false) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        eprintln!("Failed to finish step: {}", e);
+                                    }
+                                }
+                                job_result.child_process_ids.clear();
+                                job_result.is_success = false;
+                                match job_result.save() {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        eprintln!("Failed to save job result: {}", e);
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                eprintln!("{}", message);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to get job result: {}", e);
+                            }
+                        }
                     }
                 }
-                _ = cloned_cancellation_token.cancelled() => {
-                    job_result.add_log(crate::log::LogLevel::Info, "Job execution cancelled".to_string());
-                    job_result.finish_step(false);
-                    job_result.is_success = false;
-                    job_result.save().unwrap();
-                }
             }
-
-            // Remove the cancellation token after execution
-            self.cancellation_tokens.lock().await.remove(&id);
         });
+
+        self.handles.lock().await.insert(id, abort_handle);
 
         Ok(cloned_id)
     }
 
-    async fn execute_job_result(
-        &self,
+    async fn execute_job_result_internal(
         job_result: &mut JobResult,
         directory: &Path,
         parameters: &mut HashMap<String, ScriptParameterType>,
-        cancellation_token: &CancellationToken,
     ) -> Result<(), String> {
         let mut is_success = true;
 
@@ -101,10 +133,9 @@ impl JobExecutor {
                 directory,
                 step_name: &step_name,
                 job_result,
-                cancellation_token,
             };
 
-            if let Err(e) = current_step.execute(&mut context) {
+            if let Err(e) = current_step.execute(&mut context).await {
                 let message = format!("Error in step {}: {}", step_name, e);
                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
                 job_result.finish_step(false)?;
@@ -144,21 +175,17 @@ impl JobExecutor {
         let mut job_result = JobResult::try_from((job, script, true))?;
         let directory = PathBuf::from("tmp");
 
-        self.execute_job_result(
-            &mut job_result,
-            &directory,
-            &mut merged_parameters,
-            &CancellationToken::new(),
-        )
-        .await
+        Self::execute_job_result_internal(&mut job_result, &directory, &mut merged_parameters).await
     }
 
     pub async fn stop_job(&self, id: &str) -> Result<(), String> {
-        if let Some(token) = self.cancellation_tokens.lock().await.get(id) {
-            token.cancel();
+        let mut handles = self.handles.lock().await;
+        if let Some(handle) = handles.get(id) {
+            handle.abort();
+            handles.remove(id);
             Ok(())
         } else {
-            Err(format!("No active job found with id: {}", id))
+            Err(format!("Job {} not found", id))
         }
     }
 }

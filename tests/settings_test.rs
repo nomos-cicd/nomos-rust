@@ -7,8 +7,8 @@ use nomos_rust::{
     settings,
 };
 
-#[test]
-fn sync() {
+#[tokio::test]
+async fn sync() {
     let path = PathBuf::from("tests");
     let job = Job {
         id: "test-job".to_string(),
@@ -26,7 +26,7 @@ fn sync() {
     };
     let mut job_result = JobResult::try_from((&job, &script, false)).unwrap();
     job_result.save().unwrap(); // Workaround for creating yml file.
-    let res = settings::sync(path, &mut job_result);
+    let res = settings::sync(path, &mut job_result).await;
     job_result.save().unwrap(); // Workaround for creating yml file.
     assert!(res.is_ok());
     job_result.finished_at = Some(Utc::now());

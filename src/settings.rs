@@ -15,9 +15,10 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn sync(&self, job_result: &mut JobResult) -> Result<(), String> {
+    pub async fn sync(&self, job_result: &mut JobResult) -> Result<(), String> {
         let mut credential_ids: Vec<String> = Vec::new();
         for credential in &self.credentials {
+            tokio::task::yield_now().await;
             if credential.read_only {
                 job_result.add_log(
                     LogLevel::Info,
@@ -36,6 +37,7 @@ impl Settings {
 
         let credentials = Credential::get_all()?;
         for credential in credentials {
+            tokio::task::yield_now().await;
             if !credential_ids.contains(&credential.id) && !credential.read_only {
                 let res = credential.delete();
                 if let Err(e) = res {
@@ -59,24 +61,27 @@ impl TryFrom<PathBuf> for Settings {
     }
 }
 
-pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
+pub async fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String> {
     if job_result.dry_run {
         job_result.add_log(LogLevel::Info, "Dry run enabled, skipping sync".to_string());
         return Ok(());
     }
 
+    tokio::task::yield_now().await;
     let settings_path = directory.join("settings.yml");
     if settings_path.exists() {
         let settings = Settings::try_from(settings_path)?;
-        settings.sync(job_result)?;
+        settings.sync(job_result).await?;
     } else {
         job_result.add_log(LogLevel::Info, "No settings file found".to_string());
     }
 
+    tokio::task::yield_now().await;
     let scripts_path = directory.join("scripts");
     if scripts_path.exists() {
         let mut script_ids: Vec<String> = Vec::new();
         for entry in std::fs::read_dir(scripts_path).map_err(|e| e.to_string())? {
+            tokio::task::yield_now().await;
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
             match Script::try_from(path) {
@@ -89,6 +94,7 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         }
         let scripts = Script::get_all()?;
         for script in scripts {
+            tokio::task::yield_now().await;
             if !script_ids.contains(&script.id) {
                 match script.delete() {
                     Ok(_) => job_result.add_log(LogLevel::Info, format!("Deleted script {:?}", script.id)),
@@ -100,10 +106,13 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
         job_result.add_log(LogLevel::Info, "No scripts directory found".to_string());
     }
 
+    tokio::task::yield_now().await;
     let jobs_path = directory.join("jobs");
     if jobs_path.exists() {
+        tokio::task::yield_now().await;
         let mut job_ids: Vec<String> = Vec::new();
         for entry in std::fs::read_dir(jobs_path).map_err(|e| e.to_string())? {
+            tokio::task::yield_now().await;
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
             match Job::try_from(path) {
@@ -112,7 +121,7 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
                         job_result.add_log(LogLevel::Info, format!("Skipping read-only job {:?}", job.id));
                         continue;
                     }
-                    match job.sync(job_result.into()) {
+                    match job.sync(job_result.into()).await {
                         Ok(_) => job_ids.push(job.id.clone()),
                         Err(e) => job_result.add_log(LogLevel::Error, format!("Error syncing job: {:?}", e)),
                     }
@@ -120,8 +129,10 @@ pub fn sync(directory: PathBuf, job_result: &mut JobResult) -> Result<(), String
                 Err(e) => job_result.add_log(LogLevel::Error, format!("Error creating job: {:?}", e)),
             }
         }
+        tokio::task::yield_now().await;
         let jobs = Job::get_all()?;
         for job in jobs {
+            tokio::task::yield_now().await;
             if !job_ids.contains(&job.id) && !job.read_only {
                 match job.delete() {
                     Ok(_) => job_result.add_log(LogLevel::Info, format!("Deleted job {:?}", job.id)),

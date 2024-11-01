@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::{
     credential::{Credential, CredentialType},
     job::{GithubPayload, Job, TriggerType},
-    script::{models::Script, ScriptParameterType},
+    script::ScriptParameterType,
     utils::is_signature_valid,
     AppState,
 };
@@ -43,12 +43,27 @@ pub async fn get_job(Path(id): Path<String>) -> Response {
     }
 }
 
-pub async fn create_job(Json(job): Json<Job>) -> Response {
-    match job.sync(None) {
-        Ok(_) => (StatusCode::CREATED, Json(job)).into_response(),
+pub async fn create_job(headers: HeaderMap, body: String) -> Response {
+    let content_type = match headers.get("content-type") {
+        Some(ct) => ct.to_str().unwrap_or(""),
+        None => return (StatusCode::BAD_REQUEST, "Empty content-type").into_response(),
+    };
+
+    if content_type != "application/yaml" {
+        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
+    }
+
+    match serde_yaml::from_str::<Job>(&body) {
+        Ok(job) => match job.sync(None).await {
+            Ok(_) => (StatusCode::CREATED, job.id).into_response(),
+            Err(e) => {
+                eprintln!("Failed to sync job: {}", e);
+                (StatusCode::BAD_REQUEST, e).into_response()
+            }
+        },
         Err(e) => {
-            eprintln!("Failed to create job: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            eprintln!("Failed to parse job YAML: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
         }
     }
 }
@@ -91,21 +106,24 @@ pub async fn delete_job(Path(id): Path<String>) -> Response {
     }
 }
 
-#[derive(Deserialize)]
-pub struct DryRunJobPayload {
-    script: Script,
-    #[serde(default)]
-    parameters: HashMap<String, ScriptParameterType>,
-}
+pub async fn dry_run_job(headers: HeaderMap, body: String) -> Response {
+    let content_type = match headers.get("content-type") {
+        Some(ct) => ct.to_str().unwrap_or(""),
+        None => return (StatusCode::BAD_REQUEST, "Empty content-type").into_response(),
+    };
 
-pub async fn dry_run_job(Json(payload): Json<DryRunJobPayload>) -> Response {
-    let job = Job::from(&payload.script);
+    if content_type != "application/yaml" {
+        return (StatusCode::BAD_REQUEST, "Only application/yaml is supported").into_response();
+    }
 
-    match job.validate(Some(&payload.script), payload.parameters).await {
-        Ok(_) => StatusCode::OK.into_response(),
+    match serde_yaml::from_str::<Job>(&body) {
+        Ok(job) => match job.validate(None, Default::default()).await {
+            Ok(_) => StatusCode::OK.into_response(),
+            Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+        },
         Err(e) => {
-            eprintln!("Dry run failed: {}", e);
-            (StatusCode::BAD_REQUEST, e).into_response()
+            eprintln!("Failed to parse job YAML: {}", e);
+            (StatusCode::BAD_REQUEST, e.to_string()).into_response()
         }
     }
 }

@@ -5,12 +5,13 @@ use std::{
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use sysinfo::{Pid, System};
 
 use crate::script::ScriptExecutionContext;
 
 use crate::log::LogLevel;
 
-pub fn execute_command(command: &str, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+pub async fn execute_command(command: &str, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
     let child = if cfg!(target_os = "windows") {
         let mut cmd = Command::new("cmd");
         cmd.args(["/C", command]);
@@ -29,10 +30,10 @@ pub fn execute_command(command: &str, context: &mut ScriptExecutionContext<'_>) 
             .map_err(|e| e.to_string())?
     };
 
-    execute_script(child, context)
+    execute_script(child, context).await
 }
 
-pub fn execute_command_with_env(
+pub async fn execute_command_with_env(
     command: &str,
     env: Vec<(String, String)>,
     context: &mut ScriptExecutionContext<'_>,
@@ -59,17 +60,25 @@ pub fn execute_command_with_env(
             .map_err(|e| e.to_string())?
     };
 
-    execute_script(child, context)
+    execute_script(child, context).await
 }
 
-pub fn execute_script(mut child: Child, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+async fn execute_script(mut child: Child, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    eprintln!("Child process id: {}", child.id());
+    context
+        .job_result
+        .child_process_ids
+        .push(child.id().try_into().unwrap());
+    context.job_result.save()?;
     let stdout = child.stdout.take();
     if stdout.is_none() {
+        context.job_result.child_process_ids.pop();
         return Err("Failed to open stdout".to_string());
     }
     let stdout = stdout.unwrap();
     let stderr = child.stderr.take();
     if stderr.is_none() {
+        context.job_result.child_process_ids.pop();
         return Err("Failed to open stderr".to_string());
     }
     let stderr = stderr.unwrap();
@@ -97,8 +106,24 @@ pub fn execute_script(mut child: Child, context: &mut ScriptExecutionContext<'_>
         }
     });
 
-    // Wait for the child process to complete
+    loop {
+        let is_child_running = match child.try_wait() {
+            Ok(Some(_)) => false,
+            Ok(None) => true,
+            Err(_) => false,
+        };
+        if !is_child_running {
+            eprintln!("Exiting loop");
+            break;
+        }
+
+        tokio::task::yield_now().await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    }
+    tokio::task::yield_now().await;
+
     let status = child.wait().map_err(|e| e.to_string())?;
+    context.job_result.child_process_ids.pop();
 
     if status.success() {
         Ok(())
@@ -114,4 +139,27 @@ pub fn is_signature_valid(payload: &str, signature: &str, secret: &str) -> Resul
     let result = mac.finalize();
     let result = format!("sha256={}", hex::encode(result.into_bytes()));
     Ok(result == signature)
+}
+
+pub fn get_process_recursive(pid: usize) -> Vec<Pid> {
+    let s = System::new_all();
+    let root_pid = Pid::from(pid);
+    let processes = s.processes();
+
+    let mut result = Vec::new();
+    let mut last_list = [root_pid].to_vec();
+    while !last_list.is_empty() {
+        let mut new_list = Vec::new();
+        for parent_pid in last_list {
+            for (child_pid, process) in processes {
+                if process.parent() == Some(parent_pid.clone()) {
+                    new_list.push(child_pid.clone());
+                    result.push(child_pid.clone());
+                }
+            }
+        }
+        last_list = new_list;
+    }
+
+    result
 }

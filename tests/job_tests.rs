@@ -25,7 +25,8 @@ async fn do_execute_job() -> String {
     let path_buf = PathBuf::from("tests/jobs/test-job.yml");
     let job = Job::try_from(path_buf).unwrap();
     let script = Script::try_from(PathBuf::from("tests/scripts/test-script.yml")).unwrap();
-    let result = JobExecutor::execute_with_script(&job, Default::default(), &script).unwrap();
+    let job_executor = JobExecutor::new();
+    let result = job_executor.execute_with_script(&job, Default::default(), &script).await.unwrap();
     let result = JobResult::wait_for_completion(&result).await.unwrap();
 
     assert!(result.finished_at.is_some());
@@ -67,7 +68,8 @@ async fn git_clone_job() {
     let path_buf = PathBuf::from("tests/jobs/git-clone-job.yml");
     let job = Job::try_from(path_buf).unwrap();
     let script = Script::try_from(PathBuf::from("tests/scripts/git-clone-script.yml")).unwrap();
-    let result = JobExecutor::execute_with_script(&job, Default::default(), &script).unwrap();
+    let job_executor = JobExecutor::new();
+    let result = job_executor.execute_with_script(&job, Default::default(), &script).await.unwrap();
     let result = JobResult::wait_for_completion(&result).await.unwrap();
     assert!(result.finished_at.is_some());
     assert!(result.is_success);
@@ -84,7 +86,8 @@ async fn docker_job() {
     let path_buf = PathBuf::from("tests/jobs/docker-job.yml");
     let job = Job::try_from(path_buf).unwrap();
     let script = Script::try_from(PathBuf::from("tests/scripts/docker-script.yml")).unwrap();
-    let result = JobExecutor::execute_with_script(&job, Default::default(), &script).unwrap();
+    let job_executor = JobExecutor::new();
+    let result = job_executor.execute_with_script(&job, Default::default(), &script).await.unwrap();
     let result = JobResult::wait_for_completion(&result).await.unwrap();
     assert!(result.finished_at.is_some());
     assert!(result.is_success);
@@ -96,8 +99,8 @@ async fn docker_job() {
     }
 }
 
-#[test]
-fn validation() {
+#[tokio::test]
+async fn validation() {
     // Missing git step
     let script = Script {
         steps: vec![ScriptStep {
@@ -118,7 +121,7 @@ fn validation() {
         script_id: "test-script".to_string(),
         read_only: false,
     };
-    let result = job.validate(Some(&script), Default::default());
+    let result = job.validate(Some(&script), Default::default()).await;
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),

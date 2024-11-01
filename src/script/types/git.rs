@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -17,8 +18,9 @@ pub struct GitCloneScript {
     pub branch: Option<String>,
 }
 
+#[async_trait]
 impl ScriptExecutor for GitCloneScript {
-    fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
         // Substitute parameters
         let url = self
             .url
@@ -61,7 +63,9 @@ impl ScriptExecutor for GitCloneScript {
             None => "main".to_string(),
         };
 
-        git_clone(&url, branch.as_str(), credential_id.as_deref(), context)?;
+        tokio::task::yield_now().await;
+        git_clone(&url, branch.as_str(), credential_id.as_deref(), context).await?;
+        tokio::task::yield_now().await;
 
         let mut new_dir = match url.split('/').last() {
             Some(last_part) => context.directory.join(last_part),

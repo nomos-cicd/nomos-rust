@@ -26,6 +26,7 @@ pub struct JobResult {
     pub logger: Arc<Mutex<JobLogger>>,
     #[serde(skip)]
     pub dry_run: bool,
+    pub child_process_ids: Vec<usize>,
 }
 
 impl JobResult {
@@ -48,6 +49,7 @@ impl JobResult {
             finished_at: None,
             logger,
             dry_run,
+            child_process_ids: vec![],
         }
     }
 
@@ -242,6 +244,7 @@ impl Clone for JobResult {
             finished_at: self.finished_at,
             logger: Arc::clone(&self.logger),
             dry_run: self.dry_run,
+            child_process_ids: self.child_process_ids.clone(),
         }
     }
 }
