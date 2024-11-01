@@ -5,6 +5,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::{job::JobResult, log::LogLevel};
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub enum ScriptStatus {
+    #[serde(rename = "success")]
+    Success,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "aborted")]
+    Aborted,
+}
+
 use super::{default_scripts_location, types::ScriptType, ScriptParameter};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -19,11 +29,9 @@ pub struct Script {
 pub struct RunningScriptStep {
     pub name: String,
     pub values: Vec<ScriptType>,
-    pub is_started: bool,
-    pub is_finished: bool,
-    pub is_success: bool,
-    pub started_at: DateTime<Utc>,
-    pub finished_at: DateTime<Utc>,
+    pub status: ScriptStatus,
+    pub started_at: Option<DateTime<Utc>>,
+    pub finished_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
@@ -109,14 +117,12 @@ impl TryFrom<PathBuf> for Script {
 
 impl RunningScriptStep {
     pub fn start(&mut self) {
-        self.is_started = true;
-        self.started_at = Utc::now();
+        self.started_at = Some(Utc::now());
     }
 
-    pub fn finish(&mut self, is_success: bool) {
-        self.is_finished = true;
-        self.is_success = is_success;
-        self.finished_at = Utc::now();
+    pub fn finish(&mut self, status: ScriptStatus) {
+        self.status = status;
+        self.finished_at = Some(Utc::now());
     }
 }
 
@@ -125,11 +131,9 @@ impl Default for RunningScriptStep {
         RunningScriptStep {
             name: String::new(),
             values: vec![],
-            is_started: false,
-            is_finished: false,
-            is_success: false,
-            started_at: Utc::now(),
-            finished_at: Utc::now(),
+            status: ScriptStatus::Failed,
+            started_at: None,
+            finished_at: None,
         }
     }
 }

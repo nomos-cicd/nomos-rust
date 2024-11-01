@@ -10,14 +10,14 @@ use std::{
 use crate::{
     job::{models::Job, utils::default_job_results_location},
     log::{JobLogger, LogLevel},
-    script::models::{RunningScriptStep, Script},
+    script::models::{RunningScriptStep, Script, ScriptStatus},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobResult {
     pub id: String,
     pub job_id: String,
-    pub is_success: bool,
+    pub status: ScriptStatus,
     pub steps: Vec<RunningScriptStep>,
     pub current_step_name: Option<String>,
     pub started_at: DateTime<Utc>,
@@ -43,7 +43,7 @@ impl JobResult {
             job_id,
             steps: steps.clone(),
             current_step_name: steps.first().map(|step| step.name.clone()),
-            is_success: false,
+            status: ScriptStatus::Failed,
             started_at: now,
             updated_at: now,
             finished_at: None,
@@ -69,19 +69,19 @@ impl JobResult {
         }
     }
 
-    pub fn finish_step(&mut self, is_success: bool) -> Result<(), String> {
+    pub fn finish_step(&mut self, status: ScriptStatus) -> Result<(), String> {
         let now = Utc::now();
 
         let current_step_name = self.current_step_name.clone().ok_or("No current step")?;
 
         if let Some(current_step) = self.get_current_step_mut() {
-            current_step.finish(is_success);
+            current_step.finish(status.clone());
         } else {
             return Err("Failed to get current step".to_string());
         }
 
-        if !is_success {
-            self.is_success = false;
+        if status != ScriptStatus::Success {
+            self.status = status;
             self.updated_at = now;
             self.finished_at = Some(now);
             self.save()?;
@@ -236,7 +236,7 @@ impl Clone for JobResult {
         Self {
             id: self.id.clone(),
             job_id: self.job_id.clone(),
-            is_success: self.is_success,
+            status: self.status.clone(),
             steps: self.steps.clone(),
             current_step_name: self.current_step_name.clone(),
             started_at: self.started_at,

@@ -12,10 +12,12 @@ use tokio::{
 
 use crate::{
     job::models::{Job, JobResult},
-    script::{models::Script, ScriptExecutionContext, ScriptExecutor, ScriptParameterType},
+    script::{
+        models::{Script, ScriptStatus},
+        ScriptExecutionContext, ScriptExecutor, ScriptParameterType,
+    },
     utils::get_process_recursive,
 };
-
 #[derive(Debug, Clone)]
 pub struct JobExecutor {
     handles: Arc<Mutex<HashMap<String, task::AbortHandle>>>,
@@ -85,14 +87,14 @@ impl JobExecutor {
                                         }
                                     }
                                 }
-                                match job_result.finish_step(false) {
+                                match job_result.finish_step(ScriptStatus::Aborted) {
                                     Ok(_) => {}
                                     Err(e) => {
                                         eprintln!("Failed to finish step: {}", e);
                                     }
                                 }
                                 job_result.child_process_ids.clear();
-                                job_result.is_success = false;
+                                job_result.status = ScriptStatus::Aborted;
                                 match job_result.save() {
                                     Ok(_) => {}
                                     Err(e) => {
@@ -144,7 +146,7 @@ impl JobExecutor {
             if let Err(e) = current_step.execute(&mut context).await {
                 let message = format!("Error in step {}: {}", step_name, e);
                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
-                job_result.finish_step(false)?;
+                job_result.finish_step(ScriptStatus::Failed)?;
                 is_success = false;
 
                 if job_result.dry_run {
@@ -153,7 +155,7 @@ impl JobExecutor {
                 break;
             }
 
-            if let Err(e) = job_result.finish_step(true) {
+            if let Err(e) = job_result.finish_step(ScriptStatus::Success) {
                 let message = format!("Error finishing step {}: {}", step_name, e);
                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
                 is_success = false;
@@ -165,7 +167,11 @@ impl JobExecutor {
             }
         }
 
-        job_result.is_success = is_success;
+        job_result.status = if is_success {
+            ScriptStatus::Success
+        } else {
+            ScriptStatus::Failed
+        };
         job_result.save()?;
 
         Ok(())

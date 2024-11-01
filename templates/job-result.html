@@ -9,6 +9,16 @@
                 hx-get="/job-results/{{ result.id }}/header"
                 hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML">
             </div>
+            <div id="abort-status" class="uk-card uk-card-secondary uk-card-body uk-margin-bottom">
+                <h4 class="uk-card-title">Abort Status</h4>
+                <p class="abort-status {% if result.aborted %}aborted{% else %}not-aborted{% endif %}">
+                    {% if result.aborted %}
+                        Aborted
+                    {% else %}
+                        Not Aborted
+                    {% endif %}
+                </p>
+            </div>
             <div id="abort-button"
                 hx-get="/job-results/{{ result.id }}/abort-button"
                 hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML">
@@ -48,6 +58,18 @@
 
     .uk-card-body {
         padding: 20px;
+    }
+
+    .abort-status {
+        font-weight: bold;
+    }
+
+    .abort-status.aborted {
+        color: #f0506e;
+    }
+
+    .abort-status.not-aborted {
+        color: #32d296;
     }
 </style>
 {% endblock %}
