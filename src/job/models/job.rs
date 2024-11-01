@@ -107,7 +107,7 @@ impl Job {
     }
 
     pub fn delete(&self) -> Result<(), String> {
-        let path = PathBuf::from("jobs").join(format!("{}.yml", self.id));
+        let path = default_jobs_location()?.join(format!("{}.yml", self.id));
         fs::remove_file(&path).map_err(|e| format!("Failed to delete job file {}: {}", path.display(), e))
     }
 
