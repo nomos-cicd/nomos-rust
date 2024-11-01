@@ -65,13 +65,19 @@ impl Job {
 
     pub async fn sync(&self, job_result: Option<&mut JobResult>) -> Result<(), String> {
         self.validate(None, Default::default()).await?;
+        if job_result.is_none() {
+            eprintln!("Syncing job {:?}", self.id);
+            self.save()?;
+            return Ok(());
+        }
 
         match Job::get(&self.id).ok().flatten() {
             Some(existing_job) => {
                 let needs_update = existing_job.name != self.name
                     || existing_job.parameters != self.parameters
                     || existing_job.triggers != self.triggers
-                    || existing_job.script_id != self.script_id;
+                    || existing_job.script_id != self.script_id
+                    || existing_job.read_only != self.read_only;
 
                 if needs_update {
                     self.save()?;
