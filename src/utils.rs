@@ -113,7 +113,6 @@ async fn execute_script(mut child: Child, context: &mut ScriptExecutionContext<'
             Err(_) => false,
         };
         if !is_child_running {
-            eprintln!("Exiting loop");
             break;
         }
 

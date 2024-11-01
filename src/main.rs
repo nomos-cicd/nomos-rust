@@ -59,8 +59,7 @@ fn create_router() -> Router<AppState> {
         .route("/job-results/table", routing::get(template_job_results_table))
         .route("/job-results/:id", routing::get(template_job_result))
         .route("/job-results/:id/logs", routing::get(template_job_result_logs))
-        .route("/job-results/:id/header", routing::get(template_job_result_header))
-        .route("/job-results/:id/steps", routing::get(template_job_result_steps))
+        .route("/job-results/:id/:content_type", routing::get(template_job_result_dynamic_content))
 }
 
 #[tokio::main]

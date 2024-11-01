@@ -61,6 +61,12 @@ pub struct JobResultStepsTemplate<'a> {
     result: &'a JobResult,
 }
 
+#[derive(Template)]
+#[template(path = "job-result-abort-button.html")]
+pub struct JobResultAbortButtonTemplate<'a> {
+    result: &'a JobResult,
+}
+
 pub async fn template_job_results(query: Query<JobResultsQuery>) -> Response {
     match JobResult::get_all(query.job_id.clone()) {
         Ok(results) => {
@@ -151,29 +157,29 @@ pub async fn template_job_result_logs(Path(result_id): Path<String>) -> Response
     }
 }
 
-pub async fn template_job_result_header(Path(id): Path<String>) -> Response {
+pub async fn template_job_result_dynamic_content(Path((id, content_type)): Path<(String, String)>) -> Response {
     match JobResult::get(&id) {
         Ok(Some(result)) => {
             let now = Utc::now();
-            let template = JobResultHeaderTemplate { result: &result, now };
-            Html(template.render().unwrap()).into_response()
-        }
-        Ok(None) => {
-            eprintln!("Job result not found: {}", id);
-            StatusCode::NOT_FOUND.into_response()
-        }
-        Err(e) => {
-            eprintln!("Failed to get job result {}: {}", id, e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
-}
-
-pub async fn template_job_result_steps(Path(id): Path<String>) -> Response {
-    match JobResult::get(&id) {
-        Ok(Some(result)) => {
-            let template = JobResultStepsTemplate { result: &result };
-            Html(template.render().unwrap()).into_response()
+            let template = match content_type.as_str() {
+                "header" => {
+                    let template = JobResultHeaderTemplate { result: &result, now };
+                    template.render().unwrap()
+                }
+                "steps" => {
+                    let template = JobResultStepsTemplate { result: &result };
+                    template.render().unwrap()
+                }
+                "abort-button" => {
+                    let template = JobResultAbortButtonTemplate { result: &result };
+                    template.render().unwrap()
+                }
+                _ => {
+                    eprintln!("Invalid content type: {}", content_type);
+                    return StatusCode::BAD_REQUEST.into_response();
+                }
+            };
+            Html(template).into_response()
         }
         Ok(None) => {
             eprintln!("Job result not found: {}", id);
