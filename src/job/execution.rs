@@ -21,6 +21,12 @@ pub struct JobExecutor {
     handles: Arc<Mutex<HashMap<String, task::AbortHandle>>>,
 }
 
+impl Default for JobExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JobExecutor {
     pub fn new() -> Self {
         JobExecutor {
@@ -59,12 +65,12 @@ impl JobExecutor {
                 Err(e) => {
                     if e.is_cancelled() {
                         let message = format!("Cancelled job {}: {}", other_id, e);
-                        match JobResult::get(&other_id.as_str()) {
+                        match JobResult::get(other_id.as_str()) {
                             Ok(Some(mut job_result)) => {
                                 job_result.add_log(crate::log::LogLevel::Error, message.clone());
                                 let s = System::new_all();
                                 for child_process in &job_result.child_process_ids {
-                                    let mut processes = get_process_recursive(child_process.clone());
+                                    let mut processes = get_process_recursive(*child_process);
                                     processes.reverse(); // Kill child processes first
                                     eprintln!("Killing processes with PID {}", child_process);
                                     for process in processes {

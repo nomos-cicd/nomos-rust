@@ -88,7 +88,7 @@ async fn execute_script(mut child: Child, context: &mut ScriptExecutionContext<'
 
     // Spawn a task to handle stdout
     let job_result_clone = context.job_result.clone();
-    let _ = tokio::spawn(async move {
+    tokio::spawn(async move {
         for line in stdout_reader.lines().map_while(Result::ok) {
             if !line.is_empty() {
                 job_result_clone.add_log(LogLevel::Info, line);
@@ -98,7 +98,7 @@ async fn execute_script(mut child: Child, context: &mut ScriptExecutionContext<'
 
     // Spawn a task to handle stderr
     let job_result_clone = context.job_result.clone();
-    let _ = tokio::spawn(async move {
+    tokio::spawn(async move {
         for line in stderr_reader.lines().map_while(Result::ok) {
             if !line.is_empty() {
                 job_result_clone.add_log(LogLevel::Error, line);
@@ -152,9 +152,9 @@ pub fn get_process_recursive(pid: usize) -> Vec<Pid> {
         let mut new_list = Vec::new();
         for parent_pid in last_list {
             for (child_pid, process) in processes {
-                if process.parent() == Some(parent_pid.clone()) {
-                    new_list.push(child_pid.clone());
-                    result.push(child_pid.clone());
+                if process.parent() == Some(parent_pid) {
+                    new_list.push(*child_pid);
+                    result.push(*child_pid);
                 }
             }
         }
