@@ -168,6 +168,12 @@ impl ScriptExecutor for DockerRunScript {
                             match credential.value {
                                 CredentialType::Env(env) => {
                                     for line in env.value.lines() {
+                                        if line.trim().is_empty() {
+                                            continue;
+                                        }
+                                        if line.trim().starts_with('#') {
+                                            continue;
+                                        }
                                         let key = match line.split('=').next() {
                                             Some(k) => k,
                                             None => return Err("Invalid env credential: missing key".to_string()),
