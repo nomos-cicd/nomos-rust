@@ -44,6 +44,7 @@ fn create_router() -> Router<AppState> {
         .route("/api/job-results", routing::get(get_job_results))
         .route("/api/job-results/:id", routing::get(get_job_result))
         .route("/api/job-results/:id/stop", routing::post(stop_job))
+        .route("/api/job-results/:id/logs", routing::get(get_job_result_logs))
         .route("/", routing::get(template_job_results))
         .route("/credentials", routing::get(template_credentials))
         .route("/credentials/create", routing::get(template_create_credential))

@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
@@ -40,6 +40,52 @@ pub async fn stop_job(State(state): State<AppState>, Path(id): Path<String>) -> 
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => {
             eprintln!("Failed to stop job {}: {}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+pub async fn get_job_result_logs(Path(id): Path<String>) -> Response {
+    match JobResult::get(&id) {
+        Ok(Some(result)) => {
+            if let Ok(logger) = result.logger.lock() {
+                match logger.get_logs() {
+                    Ok(logs) => {
+                        let text = logs
+                            .iter()
+                            .map(|log| {
+                                format!(
+                                    "[{}] [{}] {}",
+                                    log.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                                    log.level,
+                                    log.message
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        Response::builder()
+                            .header(header::CONTENT_TYPE, "text/plain")
+                            .body(text)
+                            .unwrap()
+                            .into_response()
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to get logs for job result {}: {}", id, e);
+                        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                    }
+                }
+            } else {
+                eprintln!("Failed to lock logger for job result {}", id);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        }
+        Ok(None) => {
+            eprintln!("Job result not found: {}", id);
+            StatusCode::NOT_FOUND.into_response()
+        }
+        Err(e) => {
+            eprintln!("Failed to get job result {}: {}", id, e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
