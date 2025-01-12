@@ -9,8 +9,7 @@
                 hx-get="/job-results/{{ result.id }}/header"
                 hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML">
             </div>
-            <div id="abort-button"
-                hx-get="/job-results/{{ result.id }}/abort-button"
+            <div id="abort-button" hx-get="/job-results/{{ result.id }}/abort-button"
                 hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML">
             </div>
         </div>
@@ -33,9 +32,10 @@
     <!-- Logs Section -->
     <div class="uk-card uk-card-secondary uk-card-body uk-grid-margin">
         <h3 class="uk-card-title">Logs</h3>
-        <div class="uk-height-large uk-overflow-auto uk-background-secondary uk-padding-small">
+        <div id="logs-container" class="uk-height-large uk-overflow-auto uk-background-secondary uk-padding-small">
             <div id="logs" hx-get="/job-results/{{ result.id }}/logs"
-                hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML">
+                hx-trigger="load{% if result.finished_at.is_none() %}, every 3s{% endif %}" hx-swap="innerHTML"
+                hx-on::after-swap="scrollLogsToBottom({{ result.finished_at.is_none()|tojson }})">
             </div>
         </div>
     </div>
@@ -66,4 +66,13 @@
         color: #32d296;
     }
 </style>
+
+<script>
+    function scrollLogsToBottom(isRunning) {
+        if (isRunning) {
+            const logsContainer = document.getElementById('logs-container');
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+    }
+</script>
 {% endblock %}
