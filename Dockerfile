@@ -34,7 +34,8 @@ RUN apk add --no-cache \
     bash \
     musl-dev \
     libc6-compat \
-    gcompat
+    gcompat \
+    git-lfs
 
 # Create a non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
