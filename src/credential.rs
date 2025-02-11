@@ -128,7 +128,7 @@ impl Credential {
         match existing_credential {
             Some(existing_credential) => {
                 let existing_type = existing_credential.get_credential_type();
-                if *existing_type != *current_type || (*self).read_only != existing_credential.read_only {
+                if *existing_type != *current_type || self.read_only != existing_credential.read_only {
                     self.save()?;
                     job_result.add_log(LogLevel::Info, format!("Updated credential {:?}", self.id))
                 } else {

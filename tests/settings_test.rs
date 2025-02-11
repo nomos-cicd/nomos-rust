@@ -30,9 +30,10 @@ async fn sync() {
     job_result.save().unwrap(); // Workaround for creating yml file.
     assert!(res.is_ok());
     job_result.finished_at = Some(Utc::now());
-    job_result.status = res
-        .is_ok()
-        .then(|| ScriptStatus::Success)
-        .unwrap_or(ScriptStatus::Failed);
+    job_result.status = if res.is_ok() {
+        ScriptStatus::Success
+    } else {
+        ScriptStatus::Failed
+    };
     job_result.save().unwrap(); // Workaround for creating yml file.
 }
