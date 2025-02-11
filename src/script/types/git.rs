@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    git::git_clone,
+    git::{git_clone, git_pull},
     script::{
         utils::{ParameterSubstitution, SubstitutionResult},
         ScriptExecutionContext, ScriptExecutor, ScriptParameterType,
@@ -94,5 +94,67 @@ impl ScriptExecutor for GitCloneScript {
         );
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct GitPullScript {
+    pub directory: String,
+    pub credential_id: Option<String>,
+    pub lfs: Option<String>,
+}
+
+#[async_trait]
+impl ScriptExecutor for GitPullScript {
+    async fn execute(&self, context: &mut ScriptExecutionContext<'_>) -> Result<(), String> {
+        // Substitute parameters
+        let directory = self
+            .directory
+            .substitute_parameters(context.parameters, false)?
+            .ok_or("Directory is required")?;
+        let directory = match directory {
+            SubstitutionResult::Single(s) => s,
+            SubstitutionResult::Multiple(_) => {
+                return Err("Directory parameter cannot be an array".to_string());
+            }
+        };
+
+        let credential_id = match &self.credential_id {
+            Some(id) => id.substitute_parameters(context.parameters, true)?,
+            None => None,
+        };
+        let credential_id = match credential_id {
+            Some(id) => match id {
+                SubstitutionResult::Single(s) => Some(s),
+                SubstitutionResult::Multiple(_) => {
+                    return Err("Credential ID parameter cannot be an array".to_string());
+                }
+            },
+            None => None,
+        };
+
+        let lfs_str = match &self.lfs {
+            Some(lfs) => lfs.substitute_parameters(context.parameters, false)?,
+            None => return Err("Git LFS parameter must be a boolean".to_string()),
+        };
+        
+        let lfs_str = match lfs_str {
+            Some(lfs) => match lfs {
+                SubstitutionResult::Single(s) => s,
+                SubstitutionResult::Multiple(_) => {
+                    return Err("Git LFS parameter cannot be an array".to_string());
+                }
+            },
+            None => return Err("Git LFS parameter must be a boolean".to_string()),
+        };
+
+        let lfs = match lfs_str.to_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            _ => return Err("Git LFS parameter must be a boolean".to_string()),
+        };
+
+        tokio::task::yield_now().await;
+        git_pull(&directory, lfs, credential_id.as_deref(), context).await
     }
 }

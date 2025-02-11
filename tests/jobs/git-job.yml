@@ -9,6 +9,11 @@ parameters:
     default:
       type: string
       value: "master"
+  - name: git_lfs
+    description: Use Git LFS
+    default:
+      type: string
+      value: "false"
 triggers: []
 script_id: git-clone-script
 read_only: false

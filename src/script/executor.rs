@@ -40,6 +40,7 @@ impl ScriptExecutor for ScriptType {
         match self {
             ScriptType::Bash(bash) => bash.execute(context).await,
             ScriptType::GitClone(git_clone) => git_clone.execute(context).await,
+            ScriptType::GitPull(git_pull) => git_pull.execute(context).await,
             ScriptType::Sync(sync) => sync.execute(context).await,
             ScriptType::DockerBuild(docker_build) => docker_build.execute(context).await,
             ScriptType::DockerStop(docker_stop) => docker_stop.execute(context).await,

@@ -4,6 +4,7 @@ parameters:
   - name: git_url
     description: Image
     required: true
+    default: null
   - name: git_branch
     description: Image
     required: false
@@ -13,9 +14,17 @@ parameters:
   - name: git_credential_id
     description: Git credential ID
     required: true
+    default: null
+  - name: git_lfs
+    description: Use Git LFS
+    required: false
+    default:
+      type: string
+      value: "false"
   - name: docker_image
     description: Image
     required: true
+    default: null
   - name: docker_dockerfile
     description: Dockerfile
     required: false
@@ -25,6 +34,7 @@ parameters:
   - name: credential_id_for_env_variables
     description: Credential ID for environment variables
     required: false
+    default: null
   - name: docker_args
     description: Docker arguments
     required: false
@@ -39,6 +49,12 @@ steps:
         url: $(parameters.git_url)
         branch: $(parameters.git_branch)
         credential_id: $(parameters.git_credential_id)
+  - name: Pull
+    values:
+      - type: git-pull
+        directory: $(steps.Clone.git-clone.directory)
+        credential_id: $(parameters.git_credential_id)
+        lfs: $(parameters.git_lfs)
   - name: Build
     values:
       - type: docker-build

@@ -66,10 +66,10 @@ async fn job_result_id_test() {
 }
 
 #[tokio::test]
-async fn git_clone_job() {
-    let path_buf = PathBuf::from("tests/jobs/git-clone-job.yml");
+async fn git_job() {
+    let path_buf = PathBuf::from("tests/jobs/git-job.yml");
     let job = Job::try_from(path_buf).unwrap();
-    let script = Script::try_from(PathBuf::from("tests/scripts/git-clone-script.yml")).unwrap();
+    let script = Script::try_from(PathBuf::from("tests/scripts/git-script.yml")).unwrap();
     let job_executor = JobExecutor::new();
     let result = job_executor
         .execute_with_script(&job, Default::default(), &script)
@@ -78,7 +78,7 @@ async fn git_clone_job() {
     let result = JobResult::wait_for_completion(&result).await.unwrap();
     assert!(result.finished_at.is_some());
     assert_eq!(result.status, ScriptStatus::Success);
-    assert_eq!(result.steps.len(), 2);
+    assert_eq!(result.steps.len(), 3);
     for step in result.steps {
         assert_eq!(step.status, ScriptStatus::Success);
         assert!(step.finished_at.unwrap() > step.started_at.unwrap());
