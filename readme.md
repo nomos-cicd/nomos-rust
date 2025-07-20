@@ -1,3 +1,7 @@
+Docker supported CI/CD platform.
+
+See `tests` and `data/scripts` for examples.
+
 ```bash
 docker build -t nomos-rust .
 
